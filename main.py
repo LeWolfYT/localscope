@@ -8,7 +8,6 @@ import time as t
 timeformat = "%I:%M %p"
 
 weatheraddr = "http://wttr.in?format=j2"
-weatheraddr = "http://wttr.in/Myrtle_Beach?format=j2"
 
 def wraptext(text, rect, font):
     rect = pg.Rect(rect)
