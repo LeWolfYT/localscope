@@ -3,12 +3,14 @@ import requests as r
 import pygame as pg
 import datetime as dt
 from io import BytesIO
-import time as t
+import vars
 
 timeformat = "%I:%M %p"
 
-weatheraddr = "http://wttr.in?format=j2"
-weatheraddr = "http://wttr.in/Myrtle_Beach?format=j2"
+if vars.weatheraddr in ["", None]:
+    weatheraddr = "http://wttr.in?format=j2"
+else:
+    weatheraddr = vars.weatheraddr
 
 def wraptext(text, rect, font):
     rect = pg.Rect(rect)
@@ -57,10 +59,10 @@ def degrees_to_compass(degrees):
 
 pg.init()
 window = pg.display.set_mode((1024, 768))
-pg.display.set_caption("Weather")
+pg.display.set_caption("My Weather Station")
 
-daytheme = pg.mixer.Sound("/Users/pj/Downloads/Wolf-Proj/weather/forecastdayalt.mp3")
-nighttheme = pg.mixer.Sound("/Users/pj/Downloads/Wolf-Proj/weather/forecastnightalt.mp3")
+daytheme = pg.mixer.Sound(vars.daytheme)
+nighttheme = pg.mixer.Sound(vars.nighttheme)
 
 def generateGradient(col1, col2, w=1024, h=768, a1=255, a2=255):
     r1, g1, b1 = col1[0], col1[1], col1[2]
@@ -212,6 +214,21 @@ def drawshadowcrunchcol(text, col, size, x, y, offset, targetWidth, shadow=127):
     window.blit(textn, (x, y))
     return size.render(text, 1, (255, 255, 255, 255))
 
+def drawshadowbigcrunch(text, col, size, x, y, offset, targetWidth, targetHeight, shadow=127):
+    text = str(text)
+    textn = size.render(text, 1, col)
+    textsh = size.render(text, 1, (shadow/1.5, shadow/1.5, shadow/1.5, shadow))
+    if size.size(text)[0] > targetWidth:
+        textn = pg.transform.smoothscale(textn, (targetWidth, size.size(text)[1]))
+        textsh = pg.transform.smoothscale(textsh, (targetWidth, size.size(text)[1]))
+    if size.size(text)[1] > targetHeight:
+        textn = pg.transform.smoothscale(textn, (size.size(text)[0], size.size(text)[1]))
+        textsh = pg.transform.smoothscale(textsh, (size.size(text)[0], size.size(text)[1]))
+    textsh = pg.transform.gaussian_blur(expandSurface(textsh, 6), 4)
+    window.blit(textsh, (x+offset, y+offset), special_flags=pg.BLEND_RGBA_MULT)
+    window.blit(textn, (x, y))
+    return size.render(text, 1, (255, 255, 255, 255))
+
 def drawshadowtempcol(temp, col, size: pg.font.Font, x, y, offset, shadow=127):
     temp = str(temp)
     textn = size.render(temp, 1, col)
@@ -252,6 +269,7 @@ def main():
     playingmusic = 0
     view = 0
     alertscroll = 0
+    alertshow = 0
     showingalert = 0
     alerttimer = 300
     clock = pg.time.Clock()
@@ -272,8 +290,12 @@ def main():
                     if bottomtomorrow > 13:
                         bottomtomorrow = 0
                     nightv = not nightv
+                    alertshow += 1
+                    if alertshow > len(alerts)-1:
+                        alertshow = 0
                 elif event.button == pg.BUTTON_RIGHT:
                     bottomtomorrow = 0
+                    alertshow = 0
                     nightv = False
                     view += 1
                     if view > 2:
@@ -428,8 +450,7 @@ def main():
                     drawshadowtext(periods[i*2+(not nowisday)+nightv]["windDirection"], medfont, 85+i*142-medfont.size(periods[i*2+(not nowisday)+nightv]["windDirection"])[0]/2, 330, 5, 127)
                     window.blit(weathericons[i*2+(not nowisday)+nightv], (21+142*i, 417+128+5))
             elif view == 3:
-                pass
-                #drawshadowtextcol(alerts[])
+                drawshadowtextcol(alerts[alertshow]["properties"]["description"])
             #housekeeping
             window.blit(bottomgradient, (0, 704))
             drawshadowtext(f"Last updated at {obstimeshort} UTC", smallmedfont, 5, 768-64+5, 5, 127)
