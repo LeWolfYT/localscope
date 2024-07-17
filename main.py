@@ -8,6 +8,7 @@ import time as t
 timeformat = "%I:%M %p"
 
 weatheraddr = "http://wttr.in?format=j2"
+weatheraddr = "http://wttr.in/Myrtle_Beach?format=j2"
 
 def wraptext(text, rect, font):
     rect = pg.Rect(rect)
@@ -326,10 +327,14 @@ def main():
                 drawshadowtext(periods[bottomtomorrow]["name"].upper(), smallmedfont, 5, 465, 5, 127)
             
             drawshadowtext(weather["nearest_area"][0]["areaName"][0]["value"], smallmedfont, 1024-10-location.get_width(), 5, 5, 127)
+            viewnames = ["Split View", "Overview", "7-Day Forecast", "Alerts"]
+            viewName = viewnames[view]
             if view == 0:
                 viewName = "Split View"
             elif view == 1:
                 viewName = "Overview"
+            elif view == 2:
+                viewName = "7-Day Forecast"
             elif view == 2:
                 viewName = "7-Day Forecast"
             drawshadowtext(viewName, smallmedfont, 512-smallmedfont.size(viewName)[0]/2, 5, 5, 127)
@@ -340,21 +345,22 @@ def main():
             #drawshadowtempcol(round(formatMetric(weather2["features"][0]["properties"]["minTemperatureLast24Hours"])), (135, 206, 250, 255), smallmedfont,405, 80, 5, 127)
             #drawshadowtempcol(round(formatMetric(weather2["features"][0]["properties"]["maxTemperatureLast24Hours"])), (255, 140, 0, 255), smallmedfont, 480, 80, 5, 127)
             # alerts
-            if len(alerts) > 0 and not view in [0, 1]:
-                if len(alerts) > 1:
-                    if alerttimer > 0:
-                        alerttimer -= 1
-                    else:
-                        alertscroll += 5
-                if alertscroll > 1024:
-                    showingalert += 1
-                    alertscroll = 0
-                    alerttimer = 300
-                    if showingalert > len(alerts)-1:
-                        showingalert = 0
-                drawshadowcrunchcol(alerts[showingalert]["properties"]["headline"], (255, 0, 0), smallmedfont, 5 + alertscroll, 80, 5, 1024-15, 127)
-                if len(alerts) > 1:
-                    drawshadowcrunchcol(alerts[(showingalert+1) if showingalert != len(alerts)-1 else 0]["properties"]["headline"], (255, 0, 0), smallmedfont, -1019 + alertscroll, 80, 5, 1024-15, 127)
+            if view != 3:
+                if len(alerts) > 0:
+                    if len(alerts) > 1:
+                        if alerttimer > 0:
+                            alerttimer -= 1
+                        else:
+                            alertscroll += 5
+                    if alertscroll > 1024:
+                        showingalert += 1
+                        alertscroll = 0
+                        alerttimer = 300
+                        if showingalert > len(alerts)-1:
+                            showingalert = 0
+                    drawshadowcrunchcol(alerts[showingalert]["properties"]["headline"], (255, 0, 0), smallmedfont, 5 + alertscroll, 80, 5, 1024-15, 127)
+                    if len(alerts) > 1:
+                        drawshadowcrunchcol(alerts[(showingalert+1) if showingalert != len(alerts)-1 else 0]["properties"]["headline"], (255, 0, 0), smallmedfont, -1019 + alertscroll, 80, 5, 1024-15, 127)
             else:
                 drawshadowtext("No active alerts in your area.", smallmedfont, 5, 80, 5, 127)
             # current
@@ -398,7 +404,7 @@ def main():
                     drawshadowtext(f'Wind: {periods[bottomtomorrow]["windDirection"]} @ {periods[bottomtomorrow]["windSpeed"]}', smallmedfont, 440, 590, 5, 127)
                     drawshadowcrunch(periods[bottomtomorrow]["shortForecast"], smallmedfont, 440, 640, 5, 1024-440-10, 127)
                 else:
-                    drawshadowtext("\n".join(wraptext(periods[0]["detailedForecast"], pg.Rect(350, 480, 1024-350-15, 768-64-15), smallishfont)), smallishfont, 350, 480, 5, 127)
+                    drawshadowtext("\n".join(wraptext(periods[0]["detailedForecast"], pg.Rect(350, 480, 1024-350-15, 768-64-15), smallfont)), smallfont, 350, 480, 5, 127)
                     buffer = pg.Surface((192, 192))
                     pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 192, 192))
                     buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
@@ -420,7 +426,10 @@ def main():
                     drawshadowtemp(periods[i*2+(not nowisday)+nightv]["temperature"], bigfont, 30 + i*142, 168, 5, 127)
                     drawshadowtext("Wind:", smallishfont, 40 + i*142, 300, 5, 127)
                     drawshadowtext(periods[i*2+(not nowisday)+nightv]["windDirection"], medfont, 85+i*142-medfont.size(periods[i*2+(not nowisday)+nightv]["windDirection"])[0]/2, 330, 5, 127)
-                    window.blit(weathericons[i*2+(not nowisday)+nightv], (21+142*i, 417+128))
+                    window.blit(weathericons[i*2+(not nowisday)+nightv], (21+142*i, 417+128+5))
+            elif view == 3:
+                pass
+                #drawshadowtextcol(alerts[])
             #housekeeping
             window.blit(bottomgradient, (0, 704))
             drawshadowtext(f"Last updated at {obstimeshort} UTC", smallmedfont, 5, 768-64+5, 5, 127)
