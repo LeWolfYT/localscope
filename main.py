@@ -6,8 +6,8 @@ from io import BytesIO
 import vars
 
 #note: your vars file must have the following variables:
-# daytheme (str) (local path to any pygame-playable format. two are included by default)
-# nighttheme (str) (theme if it's past sunset or before sunrise. two are included by default)
+# daytheme (str) (local path to any pygame-playable format. three are included by default)
+# nighttheme (str) (theme if it's past sunset or before sunrise. three are included by default)
 #these are optional:
 # weatheraddr (str) (http://wttr.in?format=j2 by default)
 # laptopui (bool) (false by default, hides some of the top elements and replaces it with system info)
