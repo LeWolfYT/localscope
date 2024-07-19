@@ -5,12 +5,18 @@ import datetime as dt
 from io import BytesIO
 import vars
 
+#note: your vars file must have the following variables:
+# daytheme (str) (local path to any pygame-playable format. two are included by default)
+# nighttheme (str) (theme if it's past sunset or before sunrise. two are included by default)
+#these are optional:
+# weatheraddr (str) (http://wttr.in?format=j2 by default)
+# laptopui (bool) (false by default, hides some of the top elements and replaces it with system info)
+
 timeformat = "%I:%M %p"
 
-if vars.weatheraddr in ["", None]:
-    weatheraddr = "http://wttr.in?format=j2"
-else:
-    weatheraddr = vars.weatheraddr
+laptopui = getattr(vars, "laptopui", False)
+
+weatheraddr = getattr(vars, "weatheraddr", "http://wttr.in?format=j2")
 
 def wraptext(text, rect, font):
     rect = pg.Rect(rect)
@@ -136,6 +142,12 @@ weekbg.blit(generateGradient((0, 40, 255), (0, 140,  255), w=130, h=546), (5, 5)
 weekbgn = generateGradient((140, 140, 140), (40, 40, 40), w=140, h=556)
 weekbgn.blit(generateGradient((40, 40, 40), (140, 140,  140), w=130, h=546), (5, 5))
 
+weekbgc = generateGradient((0, 140, 255), (0, 40, 255), w=140, h=276)
+weekbgc.blit(generateGradient((0, 40, 255), (0, 140,  255), w=130, h=266), (5, 5))
+
+weekbgnc = generateGradient((140, 140, 140), (40, 40, 40), w=140, h=276)
+weekbgnc.blit(generateGradient((40, 40, 40), (140, 140,  140), w=130, h=266), (5, 5))
+
 fontname = "Arial"
 bold = True
 sizemult = 1
@@ -218,12 +230,12 @@ def drawshadowbigcrunch(text, col, size, x, y, offset, targetWidth, targetHeight
     text = str(text)
     textn = size.render(text, 1, col)
     textsh = size.render(text, 1, (shadow/1.5, shadow/1.5, shadow/1.5, shadow))
-    if size.size(text)[0] > targetWidth:
-        textn = pg.transform.smoothscale(textn, (targetWidth, size.size(text)[1]))
-        textsh = pg.transform.smoothscale(textsh, (targetWidth, size.size(text)[1]))
-    if size.size(text)[1] > targetHeight:
-        textn = pg.transform.smoothscale(textn, (size.size(text)[0], size.size(text)[1]))
-        textsh = pg.transform.smoothscale(textsh, (size.size(text)[0], size.size(text)[1]))
+    if textn.get_width() > targetWidth:
+        textn = pg.transform.smoothscale_by(textn, (targetWidth/textn.get_width(), 1))
+        textsh = pg.transform.smoothscale_by(textsh, (targetWidth/textsh.get_width(), 1))
+    if textn.get_height() > targetHeight:
+        textn = pg.transform.smoothscale_by(textn, (1, targetHeight/textn.get_height()))
+        textsh = pg.transform.smoothscale_by(textsh, (1, targetHeight/textsh.get_height()))
     textsh = pg.transform.gaussian_blur(expandSurface(textsh, 6), 4)
     window.blit(textsh, (x+offset, y+offset), special_flags=pg.BLEND_RGBA_MULT)
     window.blit(textn, (x, y))
@@ -284,22 +296,25 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 working = False
-            elif event.type == pg.MOUSEBUTTONDOWN:
-                if event.button == pg.BUTTON_LEFT:
-                    bottomtomorrow += 1
-                    if bottomtomorrow > 13:
+            if not loading:
+                if event.type == pg.MOUSEBUTTONDOWN:
+                    if event.button == pg.BUTTON_LEFT:
+                        bottomtomorrow += 1
+                        if bottomtomorrow > 13:
+                            bottomtomorrow = 0
+                        nightv += 1
+                        if nightv > 4:
+                            nightv = 0
+                        alertshow += 1
+                        if alertshow > len(alerts)-1:
+                            alertshow = 0
+                    elif event.button == pg.BUTTON_RIGHT:
                         bottomtomorrow = 0
-                    nightv = not nightv
-                    alertshow += 1
-                    if alertshow > len(alerts)-1:
                         alertshow = 0
-                elif event.button == pg.BUTTON_RIGHT:
-                    bottomtomorrow = 0
-                    alertshow = 0
-                    nightv = False
-                    view += 1
-                    if view > 2:
-                        view = 0
+                        nightv = False
+                        view += 1
+                        if view > 3:
+                            view = 0
         if not working:
             break
         window.blit(gradient, (0, 0))
@@ -338,7 +353,6 @@ def main():
             periods = weather3["properties"]["periods"]
             currenttemp = giganticfont.render(f'{round(formatMetric(weather2["features"][0]["properties"]["temperature"]))}', 1, (255, 255, 255, 255))
             currentcondition = smallmedfont.render(weather2["features"][0]["properties"]["textDescription"], 1, (255, 255, 255, 255))
-            location = smallmedfont.render(weather["nearest_area"][0]["areaName"][0]["value"], 1, (255, 255, 255, 255))
             #top bar
             window.blit(topshadow, (0, 64), special_flags=pg.BLEND_RGBA_MULT)
             window.blit(topgradient, (0, 0))
@@ -348,19 +362,17 @@ def main():
                 window.blit(topgradient, (0, 460))
                 drawshadowtext(periods[bottomtomorrow]["name"].upper(), smallmedfont, 5, 465, 5, 127)
             
-            drawshadowtext(weather["nearest_area"][0]["areaName"][0]["value"], smallmedfont, 1024-10-location.get_width(), 5, 5, 127)
             viewnames = ["Split View", "Overview", "7-Day Forecast", "Alerts"]
             viewName = viewnames[view]
-            if view == 0:
-                viewName = "Split View"
-            elif view == 1:
-                viewName = "Overview"
-            elif view == 2:
-                viewName = "7-Day Forecast"
-            elif view == 2:
-                viewName = "7-Day Forecast"
-            drawshadowtext(viewName, smallmedfont, 512-smallmedfont.size(viewName)[0]/2, 5, 5, 127)
-            drawshadowtext("CURRENT", smallmedfont, 5, 5, 5, 127)
+            if view == 2:
+                viewName = ["7-Day Forecast (Day)", "7-Day Forecast (Night)", "7-Day Forecast (Page 1)", "7-Day Forecast (Page 2)", "7-Day Forecast (Compact)"][nightv]
+            if not laptopui:
+                location = smallmedfont.render(weather["nearest_area"][0]["areaName"][0]["value"], 1, (255, 255, 255, 255))
+                drawshadowtext(viewName, smallmedfont, 512-smallmedfont.size(viewName)[0]/2, 5, 5, 127)
+                drawshadowtext("CURRENT", smallmedfont, 5, 5, 5, 127)
+                drawshadowtext(weather["nearest_area"][0]["areaName"][0]["value"], smallmedfont, 1024-10-location.get_width(), 5, 5, 127)
+            else:
+                drawshadowtext(8, smallmedfont, 5, 5, 5, 127)
             #today
             # today's forecast (min, axg, max) (deprecated)
             #drawshadowtemp("Previous 24h extremes:", smallmedfont, 5, 80, 5, 127)
@@ -383,8 +395,8 @@ def main():
                     drawshadowcrunchcol(alerts[showingalert]["properties"]["headline"], (255, 0, 0), smallmedfont, 5 + alertscroll, 80, 5, 1024-15, 127)
                     if len(alerts) > 1:
                         drawshadowcrunchcol(alerts[(showingalert+1) if showingalert != len(alerts)-1 else 0]["properties"]["headline"], (255, 0, 0), smallmedfont, -1019 + alertscroll, 80, 5, 1024-15, 127)
-            else:
-                drawshadowtext("No active alerts in your area.", smallmedfont, 5, 80, 5, 127)
+                else:
+                    drawshadowtext("No active alerts in your area.", smallmedfont, 5, 80, 5, 127)
             # current
             if view in [0, 1]:
                 precip = weather2["features"][0]["properties"]["precipitationLastHour"]["value"]
@@ -434,23 +446,66 @@ def main():
                     window.blit(weathericonbig, (100, 480))
             elif view == 2:
                 nowisday = periods[0]["isDaytime"]
-                for i in range(7):
-                    buffer = pg.Surface((140, 556))
-                    pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 140, 556))
-                    buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
-                    window.blit(buffer, (20 + i*142, 133), special_flags=pg.BLEND_RGBA_MULT)
-                    window.blit(weekbg if not nightv else weekbgn, (15 + i*142, 128))
-                    if nowisday and i == 0:
-                        continue
-                    if not nowisday and i == 6 and nightv:
-                        continue
-                    drawshadowtext(periods[i*2+(not nowisday)+nightv]["name"][0:3].upper(), smallmedfont, 15+i*142+70-smallmedfont.size(periods[i*2+(not nowisday)+nightv]["name"][0:3].upper())[0]/2, 138, 5, 127)
-                    drawshadowtemp(periods[i*2+(not nowisday)+nightv]["temperature"], bigfont, 30 + i*142, 168, 5, 127)
-                    drawshadowtext("Wind:", smallishfont, 40 + i*142, 300, 5, 127)
-                    drawshadowtext(periods[i*2+(not nowisday)+nightv]["windDirection"], medfont, 85+i*142-medfont.size(periods[i*2+(not nowisday)+nightv]["windDirection"])[0]/2, 330, 5, 127)
-                    window.blit(weathericons[i*2+(not nowisday)+nightv], (21+142*i, 417+128+5))
+                if nightv <= 1:
+                    for i in range(7):
+                        buffer = pg.Surface((140, 556))
+                        pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 140, 556))
+                        buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                        window.blit(buffer, (20 + i*142, 133), special_flags=pg.BLEND_RGBA_MULT)
+                        window.blit(weekbg if not nightv else weekbgn, (15 + i*142, 128))
+                        if nowisday and i == 0:
+                            continue
+                        if not nowisday and i == 6 and nightv:
+                            continue
+                        drawshadowtext(periods[i*2+(not nowisday)+nightv]["name"][0:3].upper(), smallmedfont, 15+i*142+70-smallmedfont.size(periods[i*2+(not nowisday)+nightv]["name"][0:3].upper())[0]/2, 138, 5, 127)
+                        drawshadowtemp(periods[i*2+(not nowisday)+nightv]["temperature"], bigfont, 30 + i*142, 168, 5, 127)
+                        drawshadowtext("Wind:", smallishfont, 40 + i*142, 300, 5, 127)
+                        drawshadowtext(periods[i*2+(not nowisday)+nightv]["windDirection"], medfont, 85+i*142-medfont.size(periods[i*2+(not nowisday)+nightv]["windDirection"])[0]/2, 330, 5, 127)
+                        window.blit(weathericons[i*2+(not nowisday)+nightv], (21+142*i, 417+128+5))
+                elif nightv <= 3:
+                    for i in range(7):
+                        buffer = pg.Surface((140, 556))
+                        pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 140, 556))
+                        buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                        window.blit(buffer, (20 + i*142, 133), special_flags=pg.BLEND_RGBA_MULT)
+                        drawnight = (i % 2 == 0)
+                        offset = not nowisday
+                        if not nowisday:
+                            drawnight = not drawnight
+                        if nightv == 3:
+                            drawnight = not drawnight
+                        window.blit(weekbg if not drawnight else weekbgn, (15 + i*142, 128))
+                        if nowisday and i in [0, 1] and nightv == 2:
+                            continue
+                        if not nowisday and i >= 5 and nightv == 3:
+                            continue
+                        drawshadowtext(periods[i+offset+(nightv-2)*7]["name"][0:3].upper(), smallmedfont, 15+i*142+70-smallmedfont.size(periods[i+offset+(nightv-2)*7]["name"][0:3].upper())[0]/2, 138, 5, 127)
+                        drawshadowtemp(periods[i+offset+(nightv-2)*7]["temperature"], bigfont, 30 + i*142, 168, 5, 127)
+                        drawshadowtext("Wind:", smallishfont, 40 + i*142, 300, 5, 127)
+                        drawshadowtext(periods[i+offset+(nightv-2)*7]["windDirection"], medfont, 85+i*142-medfont.size(periods[i+offset+(nightv-2)*7]["windDirection"])[0]/2, 330, 5, 127)
+                        window.blit(weathericons[i+offset+(nightv-2)*7], (21+142*i, 417+128+5))
+                else:
+                    for j in range(14):
+                        i = j%7
+                        drawingn = (j > 6)
+                        buffer = pg.Surface((140, 276))
+                        pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 140, 276))
+                        buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                        window.blit(buffer, (20 + i*142, 133+280*drawingn), special_flags=pg.BLEND_RGBA_MULT)
+                        window.blit(weekbgc if not drawingn else weekbgnc, (15 + i*142, 128+280*drawingn))
+                        if nowisday and i == 0:
+                            continue
+                        if not nowisday and i == 6 and drawingn:
+                            continue
+                        drawshadowtext(periods[i*2+(not nowisday)+drawingn]["name"][0:3].upper(), smallmedfont, 15+i*142+70-smallmedfont.size(periods[i*2+(not nowisday)+drawingn]["name"][0:3].upper())[0]/2, 138+280*drawingn, 5, 127)
+                        drawshadowtemp(periods[i*2+(not nowisday)+drawingn]["temperature"], medfont, 52 + i*142, 172+280*drawingn, 5, 127)
+                        window.blit(weathericons[i*2+(not nowisday)+drawingn], (21+142*i, 417+128+5-280*(not drawingn)))
+                        drawshadowtext(f'Wind: {periods[i+(drawingn-2)*7]["windDirection"]}', smallfont, 84+i*142-smallfont.size(f'Wind: {periods[i+(drawingn-2)*7]["windDirection"]}')[0]/2, 234+280*drawingn, 5, 127)
             elif view == 3:
-                drawshadowtextcol(alerts[alertshow]["properties"]["description"])
+                if len(alerts) > 0:
+                    drawshadowbigcrunch(alerts[alertshow]["properties"]["description"], (255, 224, 224), smallmedfont, 15, 96, 5, 994, 588, 127)
+                else:
+                    drawshadowtext("No active alerts.", smallmedfont, 15, 96, 5, 127)
             #housekeeping
             window.blit(bottomgradient, (0, 704))
             drawshadowtext(f"Last updated at {obstimeshort} UTC", smallmedfont, 5, 768-64+5, 5, 127)
