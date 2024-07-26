@@ -1,0 +1,33 @@
+reference for font sizes and names
+
+radar:
+star4000, 24px
+small, 32px
+
+almanac, local, extended:
+star4000, 32px
+
+hourly:
+small and large, 32px
+
+hazards:
+star4000, 32px
+
+regional forecast:
+large, 28px
+star4000. 20px
+
+current:
+extended, 32px
+large, 24px
+
+hourly graph:
+small, 32px
+
+travel cities:
+small, 32px
+large, 32px
+
+latest observations:
+small, 32px
+star4000, 32px

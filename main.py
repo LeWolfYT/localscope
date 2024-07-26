@@ -10,11 +10,18 @@ import vars
 # nighttheme (str) (theme if it's past sunset or before sunrise. three are included by default)
 #these are optional:
 # weatheraddr (str) (http://wttr.in?format=j2 by default)
-# laptopui (bool) (false by default, hides some of the top elements and replaces it with system info)
+# no more right now
+
+#the todo list
+#TODO: add images and national weather service descriptions. make it optional
+#TODO: add a way to organize views
+#TODO: add the hourly forecast
+#TODO: hurricane images
+#TODO: make the mouse work better
+#TODO: icons to show if the mouse does something
+#TODO: add a new executable that replicates a certain 90s weather thing
 
 timeformat = "%I:%M %p"
-
-laptopui = getattr(vars, "laptopui", False)
 
 weatheraddr = getattr(vars, "weatheraddr", "http://wttr.in?format=j2")
 
@@ -100,15 +107,24 @@ def getWeather():
     global weather
     global loadingtext
     global loadingstage
+    global wttr
+    wttr = True
     loadingstage=0
     loadingtext="Loading..."
-    weather = r.get(weatheraddr).json()
-    weatherend = r.get(f'https://api.weather.gov/points/{weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}').json()
+    try:
+        weather = r.get(weatheraddr).json()
+        weatherend = r.get(f'https://api.weather.gov/points/{weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}').json()
+    except:
+        wttr = False
+        print("Error: Wttr.in is down! Please input your coordinates (lat,long).")
+        coords = input("coordinates: ")
+        weatherend = r.get(f'https://api.weather.gov/points/{coords}').json()
     loadingstage=1
     loadingtext="Retrieving stations..."
     weatherendpoint1 = weatherend["properties"]["observationStations"]
     weatherendpoint2 = weatherend["properties"]["forecast"]
     stationname = r.get(weatherendpoint1).json()["features"][0]["properties"]["stationIdentifier"]
+    print(stationname)
     global weather2 # current
     loadingstage=2
     loadingtext="Retrieving current\nconditions..."
@@ -118,7 +134,10 @@ def getWeather():
     loadingstage=3
     weather3 = r.get(weatherendpoint2).json()
     global alerts
-    alerts = r.get(f'https://api.weather.gov/alerts/active?message_type=alert&point={weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}').json()["features"]
+    if wttr:
+        alerts = r.get(f'https://api.weather.gov/alerts/active?message_type=alert&point={weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}').json()["features"]
+    else:
+        alerts = r.get(f'https://api.weather.gov/alerts/active?message_type=alert&point={coords}').json()["features"]
     global weathericons
     global weathericonbig
     loadingtext="Loading icons..."
@@ -326,30 +345,36 @@ def main():
         else:
             if True:
                 now = dt.datetime.now()
-                sunset = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunset"], timeformat)
-                sunrise = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunrise"], timeformat)
+                if wttr:
+                    sunset = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunset"], timeformat)
+                    sunrise = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunrise"], timeformat)
                 obstime = dt.datetime.strptime(weather2["features"][0]["properties"]["timestamp"] + "UTC", "%Y-%m-%dT%H:%M:%S+00:00%Z")
                 obstimeshort = obstime.strftime("%-I:%M %p")
                 night = False
-                if now.hour > sunset.hour:
-                    night = True
-                if now.hour < sunrise.hour:
-                    night = True
-                if now.hour == sunrise.hour:
-                    if now.minute < sunrise.minute:
+                if wttr:
+                    if now.hour > sunset.hour:
                         night = True
-                if now.hour == sunset.hour:
-                    if now.minute > sunset.minute:
+                    if now.hour < sunrise.hour:
                         night = True
-                
-                if (1 + night) != playingmusic:
-                    playingmusic = 1 + night
-                    if playingmusic == 1:
-                        nighttheme.fadeout(1000)
+                    if now.hour == sunrise.hour:
+                        if now.minute < sunrise.minute:
+                            night = True
+                    if now.hour == sunset.hour:
+                        if now.minute > sunset.minute:
+                            night = True
+                if wttr:
+                    if not playingmusic:
                         daytheme.play(-1)
-                    elif playingmusic == 2:
-                        daytheme.fadeout(1000)
-                        nighttheme.play(-1)
+                        playingmusic = True
+                else:
+                    if (1 + night) != playingmusic:
+                        playingmusic = 1 + night
+                        if playingmusic == 1:
+                            nighttheme.fadeout(1000)
+                            daytheme.play(-1)
+                        elif playingmusic == 2:
+                            daytheme.fadeout(1000)
+                            nighttheme.play(-1)
             periods = weather3["properties"]["periods"]
             currenttemp = giganticfont.render(f'{round(formatMetric(weather2["features"][0]["properties"]["temperature"]))}', 1, (255, 255, 255, 255))
             currentcondition = smallmedfont.render(weather2["features"][0]["properties"]["textDescription"], 1, (255, 255, 255, 255))
@@ -366,13 +391,12 @@ def main():
             viewName = viewnames[view]
             if view == 2:
                 viewName = ["7-Day Forecast (Day)", "7-Day Forecast (Night)", "7-Day Forecast (Page 1)", "7-Day Forecast (Page 2)", "7-Day Forecast (Compact)"][nightv]
-            if not laptopui:
+            if wttr:
                 location = smallmedfont.render(weather["nearest_area"][0]["areaName"][0]["value"], 1, (255, 255, 255, 255))
-                drawshadowtext(viewName, smallmedfont, 512-smallmedfont.size(viewName)[0]/2, 5, 5, 127)
-                drawshadowtext("CURRENT", smallmedfont, 5, 5, 5, 127)
+            drawshadowtext(viewName, smallmedfont, 512-smallmedfont.size(viewName)[0]/2, 5, 5, 127)
+            drawshadowtext("CURRENT", smallmedfont, 5, 5, 5, 127)
+            if wttr:
                 drawshadowtext(weather["nearest_area"][0]["areaName"][0]["value"], smallmedfont, 1024-10-location.get_width(), 5, 5, 127)
-            else:
-                drawshadowtext(8, smallmedfont, 5, 5, 5, 127)
             #today
             # today's forecast (min, axg, max) (deprecated)
             #drawshadowtemp("Previous 24h extremes:", smallmedfont, 5, 80, 5, 127)
@@ -471,6 +495,8 @@ def main():
                         drawnight = (i % 2 == 0)
                         offset = not nowisday
                         if not nowisday:
+                            drawnight = not drawnight
+                        if nightv in [2, 3]:
                             drawnight = not drawnight
                         if nightv == 3:
                             drawnight = not drawnight

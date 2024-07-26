@@ -14,3 +14,7 @@ Right now, you can also set the `weatheraddr` variable, which can be used to mod
 ## Contributing
 
 This project is in **very active** development and any and all contributions are welcome! I'll be making it a goal to label some of my spaghetti code to make contributing easier.
+
+## Versions
+
+There are currently two versions of the app. Version 1 is found in main.py, and ws4k.py is version 2. While I am mostly working on version 2, version 1 will still be updated with new features every once in a while.
