@@ -173,7 +173,7 @@ def removedopplenoise(image):
     brn = (155, 31, 4, 255)
     now = dt.now().astimezone(tz.utc)
     print(f'https://mesonet.agron.iastate.edu/archive/data/{now.year}/{zeropad(now.month)}/{zeropad(now.day)}/GIS/uscomp/{image}')
-    imgbytes = r.get(f'https://mesonet.agron.iastate.edu/archive/data/{now.year}/{zeropad(now.month)}/{zeropad(now.day)}/GIS/uscomp/{image}').content
+    imgbytes = r.get(f'https://mesonet.agron.iastate.edu/archive/data/{now.year}/{zeropad(now.month)}/{zeropad(now.day)}/GIS/uscomp/{image}', headers=rheaders).content
     imagg = img.open(BytesIO(imgbytes))
     imagg2 = imagg.convert("RGBA")
     imag = imagg2.load()
@@ -240,8 +240,8 @@ def getWeather():
     
     if wttr:
         try:
-            weather = r.get(weatheraddr).json()
-            weatherend = r.get(f'https://api.weather.gov/points/{weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}').json()
+            weather = r.get(weatheraddr, headers=rheaders).json()
+            weatherend = r.get(f'https://api.weather.gov/points/{weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}', headers=rheaders).json()
         except:
             wttr = False
             global coords
@@ -258,7 +258,7 @@ def getWeather():
             coords = input("coordinates: ")
         else:
             coords = vars.coords
-    weatherend = r.get(f'https://api.weather.gov/points/{coords}').json()
+    weatherend = r.get(f'https://api.weather.gov/points/{coords}', headers=rheaders).json()
     weatherendpoint1 = weatherend["properties"]["observationStations"]
     weatherendpoint2 = weatherend["properties"]["forecast"]
     weatherendpoint3 = weatherend["properties"]["forecastHourly"]
@@ -266,24 +266,24 @@ def getWeather():
     if getattr(vars, "station"):
         stationname = vars.station
     else:
-        stationname = r.get(weatherendpoint1).json()["features"][0]["properties"]["stationIdentifier"]
+        stationname = r.get(weatherendpoint1, headers=rheaders).json()["features"][0]["properties"]["stationIdentifier"]
     print(stationname)
     global weather2 # current
     loadingText="Retrieving conditions..."
-    weather2 = r.get(f'https://api.weather.gov/stations/{stationname}/observations').json()
-    stationinfo = r.get(f'https://api.weather.gov/stations/{stationname}/').json()
+    weather2 = r.get(f'https://api.weather.gov/stations/{stationname}/observations', headers=rheaders).json()
+    stationinfo = r.get(f'https://api.weather.gov/stations/{stationname}/', headers=rheaders).json()
     global weather3 # forecast
     loadingText="Retrieving forecast..."
-    weather3 = r.get(weatherendpoint2).json()
+    weather3 = r.get(weatherendpoint2, headers=rheaders).json()
     global weather4
-    weather4 = r.get(weatherendpoint3).json()
+    weather4 = r.get(weatherendpoint3, headers=rheaders).json()
     global weatherraw
-    weatherraw = r.get(weatherendpoint4).json()
+    weatherraw = r.get(weatherendpoint4, headers=rheaders).json()
     global alerts
     if wttr:
-        alerts = r.get(f'https://api.weather.gov/alerts/active?message_type=alert&point={weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}').json()["features"]
+        alerts = r.get(f'https://api.weather.gov/alerts/active?message_type=alert&point={weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}', headers=rheaders).json()["features"]
     else:
-        alerts = r.get(f'https://api.weather.gov/alerts/active?message_type=alert&point={coords}').json()["features"]
+        alerts = r.get(f'https://api.weather.gov/alerts/active?message_type=alert&point={coords}', headers=rheaders).json()["features"]
     global bgassets
     global currentassets
     global regionalassets
@@ -508,6 +508,10 @@ def makehourlygraph():
         pg.draw.line(surf, (255, 0, 0), (mapnum(0, 24, 4, 530, i), mapnum(maxtemp, mintemp, 4, 281, temps[i])), (mapnum(0, 24, 4, 530, i+1), mapnum(maxtemp, mintemp, 4, 281, temps[i+1])), 2)
     return surf
 
+def nonezero(val):
+    if val == None:
+        return 0
+
 def main():
     global dataloading
     dataloading = False
@@ -683,8 +687,8 @@ def main():
                     else:
                         ticker = "Wind: Calm"
             elif lmlindex == 5:
-                ceiling = weather2["features"][0]["properties"]["cloudLayers"][0]["base"]["value"]*3.281
-                ticker = f'Visib: {round(weather2["features"][0]["properties"]["visibility"]["value"]/1609)} mi. Ceiling: {"Unlimited" if ceiling == 0 else round(ceiling/100)*100} ft.'
+                ceiling = nonezero(weather2["features"][0]["properties"]["cloudLayers"][0]["base"]["value"])*3.281
+                ticker = f'Visib: {round(weather2["features"][0]["properties"]["visibility"]["value"]/1609)} mi. Ceiling: {"Unlimited" if ceiling == 0 else f"{round(ceiling/100)*100} ft."}'
         pg.display.flip()
         clock.tick(60)
 main()
