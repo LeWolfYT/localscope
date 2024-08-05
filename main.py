@@ -165,7 +165,10 @@ def getWeather():
     loadingstage=4
     for i in range(14):
         weathericons[i] = pg.image.load(BytesIO(r.get(weather3["properties"]["periods"][i]["icon"]+"&size=128", headers=rheaders).content))
-    weathericonbig = pg.image.load(BytesIO(r.get(weather2["features"][0]["properties"]["icon"]+"&size=192", headers=rheaders).content))
+    if weather2["features"][0]["properties"]["icon"]:
+        weathericonbig = pg.image.load(BytesIO(r.get(weather2["features"][0]["properties"]["icon"]+"&size=192", headers=rheaders).content))
+    else:
+        weathericonbig = pg.image.load(BytesIO(r.get(weather3["properties"]["periods"][0]["icon"]+"&size=192", headers=rheaders).content))
     for alert in alerts:
         if alert["status"] == "Actual":
             continue
