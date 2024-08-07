@@ -6,10 +6,26 @@ Do you like the Wii Forecast Channel? Maybe The Weather Channel's older WeatherS
 
 While setting up the app, you'll need to create a `vars.py` file in the same folder as the main program. An example is demonstrated below.
 ```python
-daytheme = "/path/to/music.mp3"
-nighttheme = "/my/other/music.mp3"
+weatheraddr = "http://wttr.in/?format=j2" #not used usually
+coords = "lat,long" #no spaces
+forcecoords = True #please use unless you are using musicmode="daytime". wttr.in is outdated
+station = "KPIT"
+timezone = "EST"
+
+sysfont = True #will use a system font if true, ttf if false
+font = "Arial" #font name or file path
+
+#music
+musicmode = "playlist" #playlist or daytime
+daytheme = "/path/to/day/music.mp3"
+nighttheme = "/these/only/play/in/musicmode/daytime.mp3"
+
+musicdir = "/this/only/plays/in/playlist/mode/"
+
+ads = ["example ad 1", "example ad 2", "example ad 3", "example ad 4", "example ad 5"]
+adcrawltime = 10 #in seconds
 ```
-Right now, you can also set the `weatheraddr` variable, which can be used to modify the location of the [wttr.in](https://wttr.in) API call. This value defaults to https://wttr.in?format=j2, which will do its best to approximate your location. You can set this to something like https://wttr.in/Myrtle_Beach?format=j2 to give it a better idea of your location.
+Right now, you can use this template as vars.py, changing the paths if needed.
 
 ## Contributing
 
@@ -17,4 +33,5 @@ This project is in **very active** development and any and all contributions are
 
 ## Versions
 
-There are currently two versions of the app. Version 1 is found in main.py, and ws4k.py is version 2. While I am mostly working on version 2, version 1 will still be updated with new features every once in a while.
+There are currently two versions of the app. Version 1 is found in main.py, and ws4k.py is version 2. Version 1 is the main version, and version 2 is where I experiment with things a bit more. Please use version 1.
+Recently, we've added a "Version 1.1" of sorts in the form of the LocalScan program (scan.py). If you want to live stream, use that!
