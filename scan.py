@@ -10,8 +10,10 @@ import vars
 import os
 import random as rd
 
-sound = True
-manualmusic = False
+sound = getattr(vars, "sound", True)
+manualmusic = getattr(vars, "manualmusic", False)
+ads = getattr(vars, "ads", ["Place an ad here."])
+actime = getattr(vars, "adcrawltime", 4)
 
 #caches
 global cache
@@ -1073,11 +1075,11 @@ def main():
                 if ticker > 6:
                     ticker = 0
                 if ticker == 6:
-                    tickertimer = 60 * vars.adcrawltime
+                    tickertimer = 60 * actime
                 else:
                     tickertimer = 60 * 4
                     adindex += 1
-                    if adindex > len(vars.ads)-1:
+                    if adindex > len(ads)-1:
                         adindex = 0
             else:
                 tickertimer -= 60 * delta
@@ -1112,7 +1114,7 @@ def main():
                 tickername = f'Visibility: {round(weather2["features"][0]["properties"]["visibility"]["value"]/1609)} miles'
                 tickerright = f'Ceiling: {"Unlimited" if ceiling == 0 else f"{round(ceiling/100)*100} feet"}'
             elif ticker == 6:
-                tickername = vars.ads[adindex]
+                tickername = ads[adindex]
             drawshadowtext(tickername, smallmedfont, 5, 768-64+5, 5, 127)
             drawshadowtext(tickerright, smallmedfont, 1336-5-smallmedfont.size(tickerright)[0], 768-64+5, 5, 127)
             window.blit(bottomshadow, (0, 768-64-16), special_flags=pg.BLEND_RGBA_MULT)
