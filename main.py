@@ -9,6 +9,10 @@ import vars
 import os
 import random as rd
 
+sound = False
+if sound:
+    pg.sound.init()
+
 rheaders = {
     "User-Agent": "(lewolfyt.github.io, ciblox3+myweatherstation@gmail.com)"
 }
@@ -26,7 +30,6 @@ rheaders = {
 #TODO: hurricane images
 #TODO: make the mouse work better
 #TODO: icons to show if the mouse does something
-#TODO: red mode
 
 timeformat = "%I:%M %p"
 
@@ -85,8 +88,9 @@ pg.init()
 window = pg.display.set_mode((1024, 768))
 pg.display.set_caption("My Weather Station")
 
-daytheme = pg.mixer.Sound(vars.daytheme)
-nighttheme = pg.mixer.Sound(vars.nighttheme)
+if sound:
+    daytheme = pg.mixer.Sound(vars.daytheme)
+    nighttheme = pg.mixer.Sound(vars.nighttheme)
 
 def generateGradient(col1, col2, w=1024, h=768, a1=255, a2=255):
     r1, g1, b1 = col1[0], col1[1], col1[2]
@@ -326,7 +330,7 @@ def parsetimelength(timestamp):
     finalhours += days*24
     finalhours += secs
     return finalhours
-def parseRawTimeStamp(timestamp) -> tuple[dt.timedelta, dt.timedelta, int]:
+def parseRawTimeStamp(timestamp):
     time = dt.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S+00:00/"+timestamp.split("/")[1])
     time = time - dt.timedelta(hours=4)
     periodtime = parsetimelength(timestamp)
@@ -482,43 +486,44 @@ def main():
                 redded = True
             if True:
                 now = dt.datetime.now()
-                if wttr:
-                    sunset = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunset"], timeformat)
-                    sunrise = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunrise"], timeformat)
                 obstime = dt.datetime.strptime(weather2["features"][0]["properties"]["timestamp"] + "UTC", "%Y-%m-%dT%H:%M:%S+00:00%Z")
                 obstimeshort = obstime.strftime("%-I:%M %p")
-                night = False
-                if musicmode == "playlist":
-                    if music == None:
-                        musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(os.listdir(playmusic))))
-                        music = musicc.play()
-                    elif not music.get_busy():
-                        musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(os.listdir(playmusic))))
-                        music = musicc.play()
-                else:
+                if sound:
                     if wttr:
-                        if now.hour > sunset.hour:
-                            night = True
-                        if now.hour < sunrise.hour:
-                            night = True
-                        if now.hour == sunrise.hour:
-                            if now.minute < sunrise.minute:
-                                night = True
-                        if now.hour == sunset.hour:
-                            if now.minute > sunset.minute:
-                                night = True
-                        if not playingmusic:
-                            daytheme.play(-1)
-                            playingmusic = True
+                        sunset = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunset"], timeformat)
+                        sunrise = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunrise"], timeformat)
+                    night = False
+                    if musicmode == "playlist":
+                        if music == None:
+                            musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(os.listdir(playmusic))))
+                            music = musicc.play()
+                        elif not music.get_busy():
+                            musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(os.listdir(playmusic))))
+                            music = musicc.play()
                     else:
-                        if (1 + night) != playingmusic:
-                            playingmusic = 1 + night
-                            if playingmusic == 1:
-                                nighttheme.fadeout(1000)
+                        if wttr:
+                            if now.hour > sunset.hour:
+                                night = True
+                            if now.hour < sunrise.hour:
+                                night = True
+                            if now.hour == sunrise.hour:
+                                if now.minute < sunrise.minute:
+                                    night = True
+                            if now.hour == sunset.hour:
+                                if now.minute > sunset.minute:
+                                    night = True
+                            if not playingmusic:
                                 daytheme.play(-1)
-                            elif playingmusic == 2:
-                                daytheme.fadeout(1000)
-                                nighttheme.play(-1)
+                                playingmusic = True
+                        else:
+                            if (1 + night) != playingmusic:
+                                playingmusic = 1 + night
+                                if playingmusic == 1:
+                                    nighttheme.fadeout(1000)
+                                    daytheme.play(-1)
+                                elif playingmusic == 2:
+                                    daytheme.fadeout(1000)
+                                    nighttheme.play(-1)
             periods = weather3["properties"]["periods"]
             currenttemp = giganticfont.render(f'{round(formatMetric(weather2["features"][0]["properties"]["temperature"]))}', 1, (255, 255, 255, 255))
             currentcondition = smallmedfont.render(weather2["features"][0]["properties"]["textDescription"], 1, (255, 255, 255, 255))
