@@ -704,7 +704,7 @@ def main():
     tickertimer = 60 * 4
     
     alerttimeout = 60 * 10
-    
+    adindex = -1
     scrollalert = False
     alerttarget = 0
     
@@ -883,17 +883,17 @@ def main():
                 currenttemp = drawshadowtemp(round(formatMetric(weather2["features"][0]["properties"]["temperature"])), giganticfont, 60, 80, 20, 180)
                 drawshadowtext("°F", bigfont, currenttemp.get_width()+60, 125, 10, 160)
                 if weather2["features"][0]["properties"]["windSpeed"]["value"] != None:
-                    print(weather2["features"][0]["properties"]["windSpeed"])
-                    drawshadowtext(f'Wind: {degrees_to_compass(weather2["features"][0]["properties"]["windDirection"]["value"])} @ {round((formatMetric(weather2["features"][0]["properties"]["windSpeed"])))}', smallmedfont, 540, 125, 5, 127)
+                    #print(weather2["features"][0]["properties"]["windSpeed"])
+                    drawshadowtext(f'Wind: {degrees_to_compass(weather2["features"][0]["properties"]["windDirection"]["value"])} @ {round((formatMetric(weather2["features"][0]["properties"]["windSpeed"])))} MPH', smallmedfont, 540, 125, 5, 127)
                 else:
                     drawshadowtext('Wind: Calm', smallmedfont, 540, 125, 5, 127)
                 drawshadowtext(f'Relative Humidity: {roundd(weather2["features"][0]["properties"]["relativeHumidity"]["value"], 1)}%', smallmedfont, 540, 175, 5, 127)
                 drawshadowtext(f'Precipitation: {precip} inches', smallmedfont, 540, 225, 5, 127)
                 drawshadowtext(f'Visibility: {round(weather2["features"][0]["properties"]["visibility"]["value"]/1609, 1)} miles', smallmedfont, 540, 275, 5, 127)
-                if weather2["features"][0]["properties"]["heatIndex"]:
+                if weather2["features"][0]["properties"]["heatIndex"]['value']:
                     drawshadowtext(f'Heat Index: {round(formatMetric(weather2["features"][0]["properties"]["heatIndex"]))}°F', smallmedfont, 540, 325, 5, 127)
                     drawshadowtext(f'Air pressure: {roundd(formatMetric(weather2["features"][0]["properties"]["barometricPressure"]), 2)} inHg', smallmedfont, 540, 375, 5, 127)
-                elif weather2["features"][0]["properties"]["windChill"]:
+                elif weather2["features"][0]["properties"]["windChill"]['value']:
                     drawshadowtext(f'Wind Chill: {round(formatMetric(weather2["features"][0]["properties"]["windChill"]))}°F', smallmedfont, 540, 325, 5, 127)
                     drawshadowtext(f'Air pressure: {roundd(formatMetric(weather2["features"][0]["properties"]["barometricPressure"]), 2)} inHg', smallmedfont, 540, 375, 5, 127)
                 else:
@@ -1070,9 +1070,15 @@ def main():
             
             if tickertimer <= 0:
                 ticker += 1
-                if ticker > 5:
+                if ticker > 6:
                     ticker = 0
-                tickertimer = 60 * 4
+                if ticker == 6:
+                    tickertimer = 60 * vars.adcrawltime
+                else:
+                    tickertimer = 60 * 4
+                    adindex += 1
+                    if adindex > len(vars.ads)-1:
+                        adindex = 0
             else:
                 tickertimer -= 60 * delta
             
@@ -1105,7 +1111,8 @@ def main():
                 ceiling = nonezero(weather2["features"][0]["properties"]["cloudLayers"][0]["base"]["value"])*3.281
                 tickername = f'Visibility: {round(weather2["features"][0]["properties"]["visibility"]["value"]/1609)} miles'
                 tickerright = f'Ceiling: {"Unlimited" if ceiling == 0 else f"{round(ceiling/100)*100} feet"}'
-            
+            elif ticker == 6:
+                tickername = vars.ads[adindex]
             drawshadowtext(tickername, smallmedfont, 5, 768-64+5, 5, 127)
             drawshadowtext(tickerright, smallmedfont, 1336-5-smallmedfont.size(tickerright)[0], 768-64+5, 5, 127)
             window.blit(bottomshadow, (0, 768-64-16), special_flags=pg.BLEND_RGBA_MULT)
@@ -1122,7 +1129,6 @@ def main():
             viewnames = ["Split View", "Overview", "7-Day Forecast", "Hourly Graph", f"Weather Report ({periods[0]['name']})", f"Weather Report ({periods[1]['name']})", f"Weather Report ({periods[2]['name']})", "Alerts"]
             viewName = viewnames[view]
             if view == 2:
-                
                 #force view 2
                 viewName = ["7-Day Forecast (Day)", "7-Day Forecast (Night)", "7-Day Forecast (Page 1)", "7-Day Forecast (Page 2)", "7-Day Forecast"][nightv]
             if wttr:
