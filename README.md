@@ -16,14 +16,24 @@ sysfont = True #will use a system font if true, ttf if false
 font = "Arial" #font name or file path
 
 #music
+sound = True #will play sound
 musicmode = "playlist" #playlist or daytime
 daytheme = "/path/to/day/music.mp3"
 nighttheme = "/these/only/play/in/musicmode/daytime.mp3"
+musicdir = "/Users/pj/Downloads/weathermusic"
+manualmusic = False #in playlist mode this will make songs loop until you press minus
 
 musicdir = "/this/only/plays/in/playlist/mode/"
 
 ads = ["example ad 1", "example ad 2", "example ad 3", "example ad 4", "example ad 5"]
 adcrawltime = 10 #in seconds
+
+partnered = True #you can add your logo to the 7-day forecast
+logo = "/my/cool/logo.png"
+
+graphicalwidth = 840
+#change depending on image height. keep in mind that you have around 640px of vertical space and 1000px of horizontal space
+#for the contiguous usa, 840 works fine
 ```
 Right now, you can use this template as vars.py, changing the paths if needed.
 
