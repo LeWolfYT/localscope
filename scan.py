@@ -33,19 +33,32 @@ crunchcachecol = {}
 global bigcrunchcache
 bigcrunchcache = {}
 
+global partnered
+partnered = getattr(vars, "partnered", False)
+global partnerlogo
+partnerlogo = getattr(vars, "logo", None)
+
 rheaders = {
     "User-Agent": "(lewolfyt.github.io, ciblox3+myweatherstation@gmail.com)"
 }
 
 assetdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
-logof = os.path.join(assetdir, "logo.png")
+iconf = os.path.join(assetdir, "icon.bmp")
+global logo
+logo = pg.image.load(iconf)
+pg.display.set_icon(logo)
 
-#note: your vars file must have the following variables:
-# musicmode (str) (playlist or daytime)
-# daytheme (str) (local path to any pygame-playable format. three are included by default)
-# nighttheme (str) (theme if it's past sunset or before sunrise. three are included by default)
-# weatheraddr (str) (http://wttr.in?format=j2 by default)
-# no more right now
+graphicloc = getattr(vars, "sector", "CONUS").upper()
+wgraphicloc = getattr(vars, "warningsector", "CONUS").upper()
+graphicwidth = getattr(vars, "graphicalwidth", 840)
+
+#links, no touching these unless you know what you're doing
+gtz = getattr(vars, "timezone", "GMT")
+
+#TODO: figure out what n does
+gtempurl = f"https://graphical.weather.gov/GraphicalNDFD.php?width={graphicwidth}&timezone={gtz}&sector={graphicloc}&element=t&n=4"
+grainurl = f"https://graphical.weather.gov/GraphicalNDFD.php?width={graphicwidth}&timezone={gtz}&sector={graphicloc}&element=pop12&n=4"
+warnsurl = f"https://radar.weather.gov/ridge/standard/{wgraphicloc}_0.gif"
 
 #the todo list
 #TODO: add a way to organize views
@@ -109,9 +122,9 @@ def degrees_to_compass(degrees):
     return directions[index]
 
 pg.init()
-#window = pg.display.set_mode((1336, 768))
-window = pg.Surface((1336, 768))
-final = pg.display.set_mode((1920, 1080))
+window = pg.display.set_mode((1336, 768), flags=pg.NOFRAME)
+#window = pg.Surface((1336, 768))
+#final = pg.display.set_mode((1920, 1080))
 pg.display.set_allow_screensaver(False)
 pg.mouse.set_visible(False)
 
@@ -134,6 +147,16 @@ def generateGradient(col1, col2, w=1336, h=768, a1=255, a2=255):
         surface.blit(transpar, (0, i), special_flags=pg.BLEND_RGBA_MULT)
     return surface.convert_alpha()
 
+def turnintoashadow(surf: pg.Surface, shadow=127):
+    newsurf = pg.Surface((surf.get_width(), surf.get_height())).convert_alpha()
+    newsurf.fill((0, 0, 0, 0))
+    newsurf.blit(surf)
+    black = pg.Surface((surf.get_width(), surf.get_height())).convert_alpha()
+    black.fill((0, 0, 0, shadow))
+    newsurf.blit(black, (0, 0), special_flags=pg.BLEND_RGBA_MULT)
+    newsurf = pg.transform.gaussian_blur(expandSurfaceAlpha(newsurf, 6), 4)
+    return newsurf
+
 def generateGradientHoriz(col1, col2, w=1336, h=768, a1=255, a2=255):
     r1, g1, b1 = col1[0], col1[1], col1[2]
     r2, g2, b2 = col2[0], col2[1], col2[2]
@@ -154,16 +177,26 @@ def getWeather():
     global wttr
     global redmode
     redmode = False
-    wttr = True
+    wttr = not getattr(vars, "forcecoords", False)
     loadingstage=0
     loadingtext="Loading..."
-    try:
-        weather = r.get(weatheraddr, headers=rheaders).json()
-        weatherend = r.get(f'https://api.weather.gov/points/{weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}', headers=rheaders).json()
-    except:
-        wttr = False
-        print("Error: Wttr.in is down! Please input your coordinates (lat,long).")
-        coords = input("coordinates: ")
+    if wttr:
+        try:
+            weather = r.get(weatheraddr, headers=rheaders).json()
+            weatherend = r.get(f'https://api.weather.gov/points/{weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}', headers=rheaders).json()
+        except:
+            wttr = False
+            print("Error: Wttr.in is down! Please input your coordinates (lat,long).")
+            if getattr(vars, "coords", False):
+                coords = getattr(vars, "coords")
+            else:
+                coords = input("coordinates: ")
+            weatherend = r.get(f'https://api.weather.gov/points/{coords}', headers=rheaders).json()
+    else:
+        if getattr(vars, "coords", False):
+            coords = getattr(vars, "coords")
+        else:
+            coords = input("coordinates: ")
         weatherend = r.get(f'https://api.weather.gov/points/{coords}', headers=rheaders).json()
     loadingstage=1
     loadingtext="Retrieving stations..."
@@ -193,7 +226,6 @@ def getWeather():
         alerts = r.get(f'https://api.weather.gov/alerts/active?message_type=alert&point={weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}', headers=rheaders).json()["features"]
     else:
         alerts = r.get(f'https://api.weather.gov/alerts/active?message_type=alert&point={coords}', headers=rheaders).json()["features"]
-    
     global weathericons
     global weathericonbig
     loadingtext="Loading icons..."
@@ -205,6 +237,19 @@ def getWeather():
         weathericonbig = pg.image.load(BytesIO(r.get(weather2["features"][0]["properties"]["icon"]+"&size=192", headers=rheaders).content))
     else:
         weathericonbig = pg.image.load(BytesIO(r.get(weather3["properties"]["periods"][0]["icon"]+"&size=192", headers=rheaders).content))
+    loadingtext="Loading images..."
+    global bigforecast1
+    global bigforecast2
+    global trackhurricanes
+    trackhurricanes = False
+    global radarimage
+    radarimage = pg.image.load(BytesIO(r.get(warnsurl, headers=rheaders).content))
+    global hurricaneimage
+    hurricaneimage = pg.image.load(BytesIO(r.get(f"https://www.nhc.noaa.gov/xgtwo/two_{getattr(vars, 'hurricanesector', 'pac').lower()}_0d0.png", headers=rheaders).content))
+    if partnered:
+        loadingtext = "Loading your logo..."
+        global logosurf
+        logosurf = pg.image.load(partnerlogo)
     for alert in alerts:
         print(alert["properties"]["status"])
         print(alert["properties"]["certainty"])
@@ -216,8 +261,15 @@ def getWeather():
         if not alert["properties"]["urgency"] in ["Immediate", "Expected"]:
             continue
         redmode = True
-    global logo
-    logo = pg.image.load(logof)
+        if "hurricane" in alert["properties"]["description"].lower():
+            trackhurricanes = True
+    if not redmode:
+        bigforecast1 = pg.image.load(BytesIO(r.get(gtempurl, headers=rheaders).content))
+    else:
+        bigforecast1 = pg.image.load(BytesIO(r.get(warnsurl, headers=rheaders).content))
+    bigforecast2 = pg.image.load(BytesIO(r.get(grainurl, headers=rheaders).content))
+    
+    
     global loading
     loading = False
 
@@ -235,13 +287,24 @@ def refreshWeather():
     global weathericons
     global weathericonbig
     global stationinfo
+    
     if wttr:
-        weather = r.get(weatheraddr, headers=rheaders).json()
-        weatherend = r.get(f'https://api.weather.gov/points/{weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}', headers=rheaders).json()
+        try:
+            weather = r.get(weatheraddr, headers=rheaders).json()
+            weatherend = r.get(f'https://api.weather.gov/points/{weather["nearest_area"][0]["latitude"]},{weather["nearest_area"][0]["longitude"]}', headers=rheaders).json()
+        except:
+            wttr = False
+            print("Error: Wttr.in is down! Please input your coordinates (lat,long).")
+            if getattr(vars, "coords", False):
+                coords = getattr(vars, "coords")
+            else:
+                coords = input("coordinates: ")
+            weatherend = r.get(f'https://api.weather.gov/points/{coords}', headers=rheaders).json()
     else:
-        wttr = False
-        print("Error: Wttr.in is down! Please input your coordinates (lat,long).")
-        coords = input("coordinates: ")
+        if getattr(vars, "coords", False):
+            coords = getattr(vars, "coords")
+        else:
+            coords = input("coordinates: ")
         weatherend = r.get(f'https://api.weather.gov/points/{coords}', headers=rheaders).json()
     weatherendpoint1 = weatherend["properties"]["observationStations"]
     weatherendpoint2 = weatherend["properties"]["forecast"]
@@ -265,6 +328,16 @@ def refreshWeather():
         weathericonbig = pg.image.load(BytesIO(r.get(weather2["features"][0]["properties"]["icon"]+"&size=192", headers=rheaders).content))
     else:
         weathericonbig = pg.image.load(BytesIO(r.get(weather3["properties"]["periods"][0]["icon"]+"&size=192", headers=rheaders).content))
+    global bigforecast1
+    global bigforecast2
+    bigforecast1 = pg.image.load(BytesIO(r.get(gtempurl, headers=rheaders).content))
+    bigforecast2 = pg.image.load(BytesIO(r.get(grainurl, headers=rheaders).content))
+    global trackhurricanes
+    trackhurricanes = False
+    global hurricaneimage
+    hurricaneimage = pg.image.load(BytesIO(r.get(f"https://www.nhc.noaa.gov/xgtwo/two_{getattr(vars, 'hurricanesector', 'pac').lower()}_0d0.png", headers=rheaders).content))
+    global radarimage
+    radarimage = pg.image.load(BytesIO(r.get(warnsurl, headers=rheaders).content))
     for alert in alerts:
         if not alert["properties"]["status"] == "Actual":
             continue
@@ -273,10 +346,8 @@ def refreshWeather():
         if not alert["properties"]["urgency"] in ["Immediate", "Expected"]:
             continue
         redmode = True
-    global logo
-    logo = pg.image.load(logof)
-    global loading
-    loading = False
+        if "hurricane" in alert["properties"]["description"].lower():
+            trackhurricanes = True
 
 class RepeatTimer(th.Timer):
     def run(self):  
@@ -340,6 +411,12 @@ def alphablit(surf, alpha, coord):
 
 def expandSurface(surf, expansion):
     newsurf = pg.surface.Surface((surf.get_width() + expansion*2, surf.get_height() + expansion*2))
+    newsurf.fill((255, 255, 255, 0))
+    newsurf.blit(surf, (expansion, expansion))
+    return newsurf
+
+def expandSurfaceAlpha(surf, expansion):
+    newsurf = pg.surface.Surface((surf.get_width() + expansion*2, surf.get_height() + expansion*2)).convert_alpha()
     newsurf.fill((255, 255, 255, 0))
     newsurf.blit(surf, (expansion, expansion))
     return newsurf
@@ -657,7 +734,7 @@ def makehourlygraph():
 
 def formatMetric(metric):
     if metric["value"] == None:
-        return "Error"
+        return 404
     if metric["unitCode"] == "wmoUnit:degC":
         return metric["value"]*1.8+32
     elif metric["unitCode"] == "wmoUnit:km_h-1":
@@ -716,7 +793,7 @@ def main():
     #hourlygraph
     
     
-    sections = 7
+    sections = 9
     
     try:
         global loading
@@ -757,6 +834,8 @@ def main():
                         pg.display.toggle_fullscreen()
                     if event.key == pg.K_MINUS:
                         shuffle = 1
+                    if event.key == pg.K_9:
+                        pg.display.iconify()
         if not working:
             break
         window.blit(gradient if not redmode else gradientred, (0, 0))
@@ -981,23 +1060,30 @@ def main():
                         drawshadowtext(periods[i+offset+(nightv-2)*7]["windDirection"], medfont, 85+i*142-medfont.size(periods[i+offset+(nightv-2)*7]["windDirection"])[0]/2, 330, 5, 127)
                         window.blit(weathericons[i+offset+(nightv-2)*7], (21+142*i, 417+128+5))
                 else:
-                    for j in range(14):
-                        i = j%7
-                        drawingn = (j > 6)
+                    if justswitched and "7daybuffer" not in cache:
                         buffer = pg.Surface((140, 276))
                         pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 140, 276))
                         buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
-                        window.blit(buffer, (20 + 156 + i*142, 133+280*drawingn), special_flags=pg.BLEND_RGBA_MULT)
-                        window.blit(weekbgc if not drawingn else weekbgnc, (15 + 156 + i*142, 128+280*drawingn))
+                        cache["7daybuffer"] = buffer
+                    else:
+                        buffer = cache["7daybuffer"]
+                    for j in range(14):
+                        i = j%7
+                        drawingn = (j > 6)
+                        window.blit(buffer, (20 + 156 + i*142 - 156*partnered, 133+280*drawingn), special_flags=pg.BLEND_RGBA_MULT)
+                        window.blit(weekbgc if not drawingn else weekbgnc, (15 + 156 + i*142 - 156*partnered, 128+280*drawingn))
                         if nowisday and i == 0:
                             continue
                         if not nowisday and i == 6 and drawingn:
                             continue
-                        drawshadowtext(periods[i*2+(not nowisday)+drawingn]["name"][0:3].upper(), smallmedfont, 15+ 156 +i*142+70-smallmedfont.size(periods[i*2+(not nowisday)+drawingn]["name"][0:3].upper())[0]/2, 138+280*drawingn, 5, 127)
-                        drawshadowtemp(periods[i*2+(not nowisday)+drawingn]["temperature"], medfont, 52 + 156 + i*142, 172+280*drawingn, 5, 127)
+                        drawshadowtext(periods[i*2+(not nowisday)+drawingn]["name"][0:3].upper(), smallmedfont, 15+ 156 +i*142 - 156*partnered+70-smallmedfont.size(periods[i*2+(not nowisday)+drawingn]["name"][0:3].upper())[0]/2, 138+280*drawingn, 5, 127)
+                        drawshadowtemp(periods[i*2+(not nowisday)+drawingn]["temperature"], medfont, 52 + 156 - 156*partnered + i*142, 172+280*drawingn, 5, 127)
                         if weathericons[i*2+(not nowisday)+drawingn] != None:
-                            window.blit(weathericons[i*2+(not nowisday)+drawingn], (21+ 156 +142*i, 417+128+5-280*(not drawingn)))
-                        drawshadowtext(f'Wind: {periods[i+(drawingn-2)*7]["windDirection"]}', smallfont, 84+ 156 +i*142-smallfont.size(f'Wind: {periods[i+(drawingn-2)*7]["windDirection"]}')[0]/2, 234+280*drawingn, 5, 127)
+                            window.blit(weathericons[i*2+(not nowisday)+drawingn], (21+ 156 +142*i - 156*partnered, 417+128+5-280*(not drawingn)))
+                        drawshadowtext(f'Wind: {periods[i+(drawingn-2)*7]["windDirection"]}', smallfont, 84+ 156 - 156*partnered +i*142-smallfont.size(f'Wind: {periods[i+(drawingn-2)*7]["windDirection"]}')[0]/2, 234+280*drawingn, 5, 127)
+                    if partnered:
+                        window.blit(turnintoashadow(logosurf), (20 + 142 * 7, 138))
+                        window.blit(logosurf, (15 + 142 * 7, 133))
             elif view == 3:
                 if justswitched:
                     g, gs, vs = makehourlygraph()
@@ -1011,9 +1097,24 @@ def main():
                 window.blit(graphbg, (15, 128))
                 window.blit(gs, (20, 133), special_flags=pg.BLEND_RGBA_MULT)
                 window.blit(g, (20, 133))
+                now = dt.datetime.now()
+                now6 = dt.datetime.now() + dt.timedelta(hours=6)
+                now12 = dt.datetime.now() + dt.timedelta(hours=12)
+                now18= dt.datetime.now() + dt.timedelta(hours=18)
+                now24 = dt.datetime.now() + dt.timedelta(hours=24)
+                time1 = now.strftime("%-I") + ("AM" if (now.strftime("%p") == "AM") else "PM")
+                time2 = now6.strftime("%-I") + ("AM" if (now6.strftime("%p") == "AM") else "PM")
+                time3 = now12.strftime("%-I") + ("AM" if (now12.strftime("%p") == "AM") else "PM")
+                time4 = now18.strftime("%-I") + ("AM" if (now18.strftime("%p") == "AM") else "PM")
+                time5 = now24.strftime("%-I") + ("AM" if (now24.strftime("%p") == "AM") else "PM")
                 drawshadowtext(f'{round(vs["maxtemp"])}°', smallmedfont, 20, 128, 5)
-                drawshadowtext(f'{round(vs["medtemp"])}°', smallmedfont, 20, 128+510/2, 5)
-                drawshadowtext(f'{round(vs["mintemp"])}°', smallmedfont, 20, 128+510, 5)
+                drawshadowtext(f'{round(vs["medtemp"])}°', smallmedfont, 20, 128+440/2, 5)
+                drawshadowtext(f'{round(vs["mintemp"])}°', smallmedfont, 20, 128+440, 5)
+                drawshadowtext(time1, smallmedfont, 20, 128+500, 5)
+                drawshadowtext(time2, smallmedfont, (1336-640+530)/4 + 15, 128+500, 5)
+                drawshadowtext(time3, smallmedfont, (1336-640+530)/2 + 10, 128+500, 5)
+                drawshadowtext(time4, smallmedfont, (1336-640+530)*3/4 + 5, 128+500, 5)
+                drawshadowtext(time5, smallmedfont, 1336-640+530, 128+500, 5)
                 drawshadowtextcol("Temperature", (255, 0, 0), smallmedfont, 1336-16-smallmedfont.size("Temperature")[0], 128, 5, 127)
                 drawshadowtextcol("Precipitation %", (0, 255, 255), smallmedfont, 1336-16-smallmedfont.size("Precipitation %")[0], 168, 5, 127)
                 drawshadowtextcol("Rel. Humidity %", (255, 127, 0), smallmedfont, 1336-16-smallmedfont.size("Rel. Humidity %")[0], 208, 5, 127)
@@ -1024,6 +1125,32 @@ def main():
             elif view == 6:
                 drawshadowbigcrunch("\n".join(wraptext(f'{periods[2]["name"]}...{periods[2]["detailedForecast"]}', pg.Rect(15, 128, 994+312, 588+32), smallmedfont)), (255, 255, 255), smallmedfont, 15, 128, 5, 994+312, 588+32, 127)
             elif view == 7:
+                if not redmode:
+                    buffer = pg.Surface((bigforecast1.get_width(), bigforecast1.get_height()))
+                    pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, bigforecast1.get_width(), bigforecast1.get_height()))
+                    buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                    window.blit(buffer, (1336/2-bigforecast1.get_width()/2+5, 800/2-bigforecast1.get_height()/2+5), special_flags=pg.BLEND_RGBA_MULT)
+                    window.blit(bigforecast1, (1336/2-bigforecast1.get_width()/2, 800/2-bigforecast1.get_height()/2))
+                else:
+                    buffer = pg.Surface((radarimage.get_width(), radarimage.get_height()))
+                    pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, radarimage.get_width(), radarimage.get_height()))
+                    buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                    window.blit(buffer, (1336/2-radarimage.get_width()/2+5, 800/2-radarimage.get_height()/2+5), special_flags=pg.BLEND_RGBA_MULT)
+                    window.blit(radarimage, (1336/2-radarimage.get_width()/2, 800/2-radarimage.get_height()/2))
+            elif view == 8:
+                if not trackhurricanes:
+                    buffer = pg.Surface((bigforecast2.get_width(), bigforecast2.get_height()))
+                    pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, bigforecast2.get_width(), bigforecast2.get_height()))
+                    buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                    window.blit(buffer, (1336/2-bigforecast2.get_width()/2+5, 800/2-bigforecast2.get_height()/2+5), special_flags=pg.BLEND_RGBA_MULT)
+                    window.blit(bigforecast2, (1336/2-bigforecast2.get_width()/2, 800/2-bigforecast2.get_height()/2))
+                else:
+                    buffer = pg.Surface((hurricaneimage.get_width(), hurricaneimage.get_height()))
+                    pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, hurricaneimage.get_width(), hurricaneimage.get_height()))
+                    buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                    window.blit(buffer, (1336/2-hurricaneimage.get_width()/2+5, 800/2-hurricaneimage.get_height()/2+5), special_flags=pg.BLEND_RGBA_MULT)
+                    window.blit(hurricaneimage, (1336/2-hurricaneimage.get_width()/2, 800/2-hurricaneimage.get_height()/2))
+            elif view == 9:
                 if justswitched:
                     alertscrollbig = 0
                     alerttimeout = 60 * 10
@@ -1128,7 +1255,7 @@ def main():
                 window.blit(topgradient, (0, 460))
                 drawshadowtext(periods[bottomtomorrow]["name"].upper(), smallmedfont, 5, 465, 5, 127)
             
-            viewnames = ["Split View", "Overview", "7-Day Forecast", "Hourly Graph", f"Weather Report ({periods[0]['name']})", f"Weather Report ({periods[1]['name']})", f"Weather Report ({periods[2]['name']})", "Alerts"]
+            viewnames = ["Split View", "Overview", "7-Day Forecast", "Hourly Graph", f"Weather Report ({periods[0]['name']})", f"Weather Report ({periods[1]['name']})", f"Weather Report ({periods[2]['name']})", "Temperature Forecast" if not redmode else "Severe Weather Rader", "Probability of Precipitation" if not trackhurricanes else "Hurricane Tracker", "Alerts"]
             viewName = viewnames[view]
             if view == 2:
                 #force view 2
@@ -1140,7 +1267,7 @@ def main():
             #drawshadowtext(clock.get_fps(), smallmedfont, 5, 5, 5, 127)
             if wttr:
                 drawshadowtext(weather["nearest_area"][0]["areaName"][0]["value"], smallmedfont, 1336-10-location.get_width(), 5, 5, 127)
-            
+            #drawshadowtext("Pennsylvania", smallmedfont, 1336-10-smallmedfont.size("Pennsylvania")[0], 5, 5, 127)
             
             if justswitched:
                 justswitched = False
@@ -1148,6 +1275,8 @@ def main():
                 view += 1
                 if view > sections:
                     view = 0
+                if view == 5 and redmode:
+                    view = 7
                 if view == sections and len(alerts) > 0:
                     changetime = 60 * 45
                 else:
@@ -1155,6 +1284,6 @@ def main():
                 justswitched = True
             else:
                 changetime -= 60 * delta
-        final.blit(pg.transform.smoothscale(window, (1920, 1080)), (0, 0))
+        #final.blit(pg.transform.smoothscale(window, (1920, 1080)), (0, 0))
         pg.display.flip()
 main()
