@@ -5,7 +5,7 @@ Do you like the Wii Forecast Channel? Maybe The Weather Channel's older WeatherS
 ## Setup
 
 While setting up the app, you'll need to create a `vars.py` file in the same folder as the main program. An example is demonstrated below.
-```python
+```
 weatheraddr = "http://wttr.in/?format=j2" #not used usually
 coords = "lat,long" #no spaces
 forcecoords = True #please use unless you are using musicmode="daytime". wttr.in is outdated
@@ -30,6 +30,10 @@ adcrawltime = 10 #in seconds
 
 partnered = True #you can add your logo to the 7-day forecast
 logo = "/my/cool/logo.png"
+
+scaled = True #if true, rescales to the size below
+smoothscale = True
+size = (1920, 1080)
 
 graphicalwidth = 840
 #change depending on image height. keep in mind that you have around 640px of vertical space and 1000px of horizontal space

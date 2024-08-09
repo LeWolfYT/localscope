@@ -83,7 +83,7 @@ warnsurl = f"https://radar.weather.gov/ridge/standard/{wgraphicloc}_0.gif"
 #TODO: icons to show if the mouse does something
 
 timeformat = "%I:%M %p"
-timeformattop = "%-I:%M:%S %p"
+timeformattop = "%I:%M:%S %p"
 
 weatheraddr = getattr(vars, "weatheraddr", "http://wttr.in?format=j2")
 
@@ -871,7 +871,7 @@ def main():
             if True:
                 now = dt.datetime.now()
                 obstime = dt.datetime.strptime(weather2["features"][0]["properties"]["timestamp"] + "UTC", "%Y-%m-%dT%H:%M:%S+00:00%Z")
-                obstimeshort = obstime.strftime("%-I:%M %p")
+                obstimeshort = obstime.strftime("%I:%M %p")
                 if sound:
                     if wttr:
                         sunset = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunset"], timeformat)
@@ -1120,11 +1120,11 @@ def main():
                 now12 = dt.datetime.now() + dt.timedelta(hours=12)
                 now18= dt.datetime.now() + dt.timedelta(hours=18)
                 now24 = dt.datetime.now() + dt.timedelta(hours=24)
-                time1 = now.strftime("%-I") + ("AM" if (now.strftime("%p") == "AM") else "PM")
-                time2 = now6.strftime("%-I") + ("AM" if (now6.strftime("%p") == "AM") else "PM")
-                time3 = now12.strftime("%-I") + ("AM" if (now12.strftime("%p") == "AM") else "PM")
-                time4 = now18.strftime("%-I") + ("AM" if (now18.strftime("%p") == "AM") else "PM")
-                time5 = now24.strftime("%-I") + ("AM" if (now24.strftime("%p") == "AM") else "PM")
+                time1 = now.strftime("%I") + ("AM" if (now.strftime("%p") == "AM") else "PM")
+                time2 = now6.strftime("%I") + ("AM" if (now6.strftime("%p") == "AM") else "PM")
+                time3 = now12.strftime("%I") + ("AM" if (now12.strftime("%p") == "AM") else "PM")
+                time4 = now18.strftime("%I") + ("AM" if (now18.strftime("%p") == "AM") else "PM")
+                time5 = now24.strftime("%I") + ("AM" if (now24.strftime("%p") == "AM") else "PM")
                 drawshadowtext(f'{round(vs["maxtemp"])}°', smallmedfont, 20, 128, 5)
                 drawshadowtext(f'{round(vs["medtemp"])}°', smallmedfont, 20, 128+440/2, 5)
                 drawshadowtext(f'{round(vs["mintemp"])}°', smallmedfont, 20, 128+440, 5)
