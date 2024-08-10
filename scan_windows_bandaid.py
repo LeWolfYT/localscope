@@ -145,11 +145,12 @@ else:
 pg.display.set_allow_screensaver(False)
 pg.mouse.set_visible(False)
 
-pg.display.set_caption("LocalScan v1.00")
+pg.display.set_caption("LocalScan v1.01")
 
 if sound:
-    daytheme = pg.mixer.Sound(vars.daytheme)
-    nighttheme = pg.mixer.Sound(vars.nighttheme)
+    if musicmode == "daytime":
+        daytheme = pg.mixer.Sound(vars.daytheme)
+        nighttheme = pg.mixer.Sound(vars.nighttheme)
 
 def generateGradient(col1, col2, w=1336, h=768, a1=255, a2=255):
     r1, g1, b1 = col1[0], col1[1], col1[2]
@@ -773,7 +774,8 @@ def roundd(val, precision):
 
 def stripdss(array: list):
     newar = array
-    newar.remove(".DS_Store")
+    if ".DS_Store" in newar:
+        newar.remove(".DS_Store")
     return newar
 
 pg.event.pump()

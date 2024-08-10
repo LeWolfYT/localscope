@@ -83,13 +83,19 @@ warnsurl = f"https://radar.weather.gov/ridge/standard/{wgraphicloc}_0.gif"
 #TODO: icons to show if the mouse does something
 
 timeformat = "%I:%M %p"
-timeformattop = "%-I:%M:%S %p"
+timeformattop = "%I:%M:%S %p"
 
 weatheraddr = getattr(vars, "weatheraddr", "http://wttr.in?format=j2")
 
 musicmode = getattr(vars, "musicmode", "playlist")
 
 playmusic = getattr(vars, "musicdir", False)
+
+def splubby(time):
+    if list(time)[0] == "0":
+        return time[1:]
+    else:
+        return time
 
 def wraptext(text, rect, font):
     rect = pg.Rect(rect)
@@ -127,7 +133,7 @@ def wraptext(text, rect, font):
 
 def degrees_to_compass(degrees):
     if degrees == None:
-        return "XX"
+        return "Variable"
     """Converts degrees (0-360) to 16-point compass direction."""
 
     directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
@@ -773,7 +779,8 @@ def roundd(val, precision):
 
 def stripdss(array: list):
     newar = array
-    newar.remove(".DS_Store")
+    if ".DS_Store" in newar:
+        newar.remove(".DS_Store")
     return newar
 
 pg.event.pump()
@@ -871,7 +878,9 @@ def main():
             if True:
                 now = dt.datetime.now()
                 obstime = dt.datetime.strptime(weather2["features"][0]["properties"]["timestamp"] + "UTC", "%Y-%m-%dT%H:%M:%S+00:00%Z")
-                obstimeshort = obstime.strftime("%-I:%M %p")
+                obstimetemp = obstime.replace(tzinfo=tz.utc)
+                obstimetemp = obstimetemp.astimezone(tz.timezone(getattr(vars, "timezone", "UTC")))
+                obstimeshort = splubby(obstimetemp.strftime("%I:%M %p"))
                 if sound:
                     if wttr:
                         sunset = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunset"], timeformat)
@@ -883,6 +892,11 @@ def main():
                                 musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(stripdss(os.listdir(playmusic)))))
                                 music = musicc.play()
                             elif not music.get_busy():
+                                musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(stripdss(os.listdir(playmusic)))))
+                                music = musicc.play()
+                            if shuffle:
+                                shuffle = 0
+                                music.fadeout(1000)
                                 musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(stripdss(os.listdir(playmusic)))))
                                 music = musicc.play()
                         else:
@@ -1085,23 +1099,29 @@ def main():
                         cache["7daybuffer"] = buffer
                     else:
                         buffer = cache["7daybuffer"]
+                    if partnered:
+                        if justswitched and "logoshadow" not in cache:
+                            logosh = turnintoashadow(logosurf)
+                            cache["logoshadow"] = logosh
+                        else:
+                            logosh = cache["logoshadow"]
                     for j in range(14):
                         i = j%7
                         drawingn = (j > 6)
-                        window.blit(buffer, (20 + 156 + i*142 - 156*partnered, 133+280*drawingn), special_flags=pg.BLEND_RGBA_MULT)
-                        window.blit(weekbgc if not drawingn else weekbgnc, (15 + 156 + i*142 - 156*partnered, 128+280*drawingn))
                         if nowisday and i == 0:
                             continue
                         if not nowisday and i == 6 and drawingn:
                             continue
-                        drawshadowtext(periods[i*2+(not nowisday)+drawingn]["name"][0:3].upper(), smallmedfont, 15+ 156 +i*142 - 156*partnered+70-smallmedfont.size(periods[i*2+(not nowisday)+drawingn]["name"][0:3].upper())[0]/2, 138+280*drawingn, 5, 127)
-                        drawshadowtemp(periods[i*2+(not nowisday)+drawingn]["temperature"], medfont, 52 + 156 - 156*partnered + i*142, 172+280*drawingn, 5, 127)
+                        window.blit(buffer, (20 + 156 + i*142 - 156*partnered - 78 * nowisday, 133+280*drawingn), special_flags=pg.BLEND_RGBA_MULT)
+                        window.blit(weekbgc if not drawingn else weekbgnc, (15 + 156 + i*142 - 156*partnered - 78 * nowisday, 128+280*drawingn))
+                        drawshadowtext(periods[i*2+(not nowisday)+drawingn]["name"][0:3].upper(), smallmedfont, 15+ 156 +i*142 - 78 * nowisday - 156*partnered+70-smallmedfont.size(periods[i*2+(not nowisday)+drawingn]["name"][0:3].upper())[0]/2, 138+280*drawingn, 5, 127)
+                        drawshadowtemp(periods[i*2+(not nowisday)+drawingn]["temperature"], medfont, 85 - 78 * nowisday - medfont.size(str(periods[i*2+(not nowisday)+drawingn]["temperature"]))[0]/2 + 156 - 156*partnered + i*142, 172+280*drawingn, 5, 127)
                         if weathericons[i*2+(not nowisday)+drawingn] != None:
-                            window.blit(weathericons[i*2+(not nowisday)+drawingn], (21+ 156 +142*i - 156*partnered, 417+128+5-280*(not drawingn)))
-                        drawshadowtext(f'Wind: {periods[i+(drawingn-2)*7]["windDirection"]}', smallfont, 84+ 156 - 156*partnered +i*142-smallfont.size(f'Wind: {periods[i+(drawingn-2)*7]["windDirection"]}')[0]/2, 234+280*drawingn, 5, 127)
+                            window.blit(weathericons[i*2+(not nowisday)+drawingn], (21+ 156 +142*i - 78 * nowisday - 156*partnered, 417+128+5-280*(not drawingn)))
+                        drawshadowtext(f'Wind: {periods[i+(drawingn-2)*7]["windDirection"]}', smallfont, 84+ 156 - 78 * nowisday - 156*partnered +i*142-smallfont.size(f'Wind: {periods[i+(drawingn-2)*7]["windDirection"]}')[0]/2, 234+280*drawingn, 5, 127)
                     if partnered:
-                        window.blit(turnintoashadow(logosurf), (20 + 142 * 7, 138))
-                        window.blit(logosurf, (15 + 142 * 7, 133))
+                        window.blit(turnintoashadow(logosurf), (20 - 39 * nowisday + 142 * 7, 138))
+                        window.blit(logosurf, (15 - 39 * nowisday + 142 * 7, 133))
             elif view == 3:
                 if justswitched:
                     g, gs, vs = makehourlygraph()
@@ -1120,11 +1140,11 @@ def main():
                 now12 = dt.datetime.now() + dt.timedelta(hours=12)
                 now18= dt.datetime.now() + dt.timedelta(hours=18)
                 now24 = dt.datetime.now() + dt.timedelta(hours=24)
-                time1 = now.strftime("%-I") + ("AM" if (now.strftime("%p") == "AM") else "PM")
-                time2 = now6.strftime("%-I") + ("AM" if (now6.strftime("%p") == "AM") else "PM")
-                time3 = now12.strftime("%-I") + ("AM" if (now12.strftime("%p") == "AM") else "PM")
-                time4 = now18.strftime("%-I") + ("AM" if (now18.strftime("%p") == "AM") else "PM")
-                time5 = now24.strftime("%-I") + ("AM" if (now24.strftime("%p") == "AM") else "PM")
+                time1 = splubby(now.strftime("%I")) + ("AM" if (now.strftime("%p") == "AM") else "PM")
+                time2 = splubby(now6.strftime("%I")) + ("AM" if (now6.strftime("%p") == "AM") else "PM")
+                time3 = splubby(now12.strftime("%I")) + ("AM" if (now12.strftime("%p") == "AM") else "PM")
+                time4 = splubby(now18.strftime("%I")) + ("AM" if (now18.strftime("%p") == "AM") else "PM")
+                time5 = splubby(now24.strftime("%I")) + ("AM" if (now24.strftime("%p") == "AM") else "PM")
                 drawshadowtext(f'{round(vs["maxtemp"])}°', smallmedfont, 20, 128, 5)
                 drawshadowtext(f'{round(vs["medtemp"])}°', smallmedfont, 20, 128+440/2, 5)
                 drawshadowtext(f'{round(vs["mintemp"])}°', smallmedfont, 20, 128+440, 5)
@@ -1220,18 +1240,18 @@ def main():
                 if ticker > 6:
                     ticker = 0
                 if ticker == 6:
-                    tickertimer = 60 * actime
-                else:
-                    tickertimer = 60 * 4
                     adindex += 1
                     if adindex > len(ads)-1:
                         adindex = 0
+                    tickertimer = 60 * actime
+                else:
+                    tickertimer = 60 * 4
             else:
                 tickertimer -= 60 * delta
             
             tickerright = ""
             if ticker == 0:
-                tickername = f'Last updated at {obstimeshort} UTC'
+                tickername = f'Last updated at {obstimeshort} {getattr(vars, "timezone", "UTC")}'
             elif ticker == 1:
                 tickername = f'Temperature: {round(weather2["features"][0]["properties"]["temperature"]["value"]*1.8+32)}°F'
                 if weather2["features"][0]["properties"]["heatIndex"]["value"]:
@@ -1255,7 +1275,10 @@ def main():
                     else:
                         tickername = "Wind: Calm"
             elif ticker == 5:
-                ceiling = nonezero(weather2["features"][0]["properties"]["cloudLayers"][0]["base"]["value"])*3.281
+                try:
+                    ceiling = nonezero(weather2["features"][0]["properties"]["cloudLayers"][0]["base"]["value"])*3.281
+                except IndexError:
+                    ceiling = 0
                 tickername = f'Visibility: {round(weather2["features"][0]["properties"]["visibility"]["value"]/1609)} miles'
                 tickerright = f'Ceiling: {"Unlimited" if ceiling == 0 else f"{round(ceiling/100)*100} feet"}'
             elif ticker == 6:
@@ -1277,11 +1300,11 @@ def main():
             viewName = viewnames[view]
             if view == 2:
                 #force view 2
-                viewName = ["7-Day Forecast (Day)", "7-Day Forecast (Night)", "7-Day Forecast (Page 1)", "7-Day Forecast (Page 2)", "7-Day Forecast"][nightv]
+                viewName = ["7-Day Forecast (Day)", "7-Day Forecast (Night)", "7-Day Forecast (Page 1)", "7-Day Forecast (Page 2)", "Extended Forecast"][nightv]
             if wttr:
                 location = smallmedfont.render(weather["nearest_area"][0]["areaName"][0]["value"], 1, (255, 255, 255, 255))
             drawshadowtext(viewName, smallmedfont, 824-312/2-smallmedfont.size(viewName)[0]/2, 5, 5, 127)
-            drawshadowtext(dt.datetime.now().strftime(timeformattop), smallmedfont, 5, 5, 5, 127)
+            drawshadowtext(splubby(dt.datetime.now().strftime(timeformattop)), smallmedfont, 5, 5, 5, 127)
             #drawshadowtext(clock.get_fps(), smallmedfont, 5, 5, 5, 127)
             if wttr:
                 drawshadowtext(weather["nearest_area"][0]["areaName"][0]["value"], smallmedfont, 1336-10-location.get_width(), 5, 5, 127)
@@ -1308,4 +1331,19 @@ def main():
             else:
                 final.blit(pg.transform.scale(window, scale), (0, 0))
         pg.display.flip()
-main()
+
+try:
+    main()
+except Exception as err:
+    work = True
+    while work:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                work = False
+            elif event.type == pg.KEYDOWN:
+                work = False
+            elif event.type == pg.MOUSEBUTTONDOWN:
+                work = False
+        window.blit(gradientred, (0, 0))
+        drawshadowtext(err.__str__(), smallfont, 15, 15, 5)
+        pg.display.flip()
