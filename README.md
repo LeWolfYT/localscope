@@ -36,6 +36,7 @@ smoothscale = True
 size = (1920, 1080)
 
 graphicalwidth = 840
+graphicalscale = 0.9
 #change depending on image height. keep in mind that you have around 640px of vertical space and 1000px of horizontal space
 #for the contiguous usa, 840 works fine
 ```
