@@ -10,7 +10,9 @@ import vars
 import os
 import random as rd
 import time
+import re
 
+print("getting variables")
 sound = getattr(vars, "sound", True)
 manualmusic = getattr(vars, "manualmusic", False)
 ads = getattr(vars, "ads", ["Place an ad here."])
@@ -20,11 +22,12 @@ travelcities = getattr(vars, "travelcities", ["KATL", "KBOS", "KORD", "KDFW", "K
 
 performance = getattr(vars, "performance", False)
 
-screenwidth = 1336
+screenwidth = 1366
 
 screendiff = screenwidth - 1024
 
 debug = False
+print(f"debug draw mode: {debug}")
 def debugsleep():
     if debug:
         time.sleep(0.1)
@@ -32,6 +35,7 @@ def debugsleep():
         pg.event.pump()
 
 #caches
+print("making cache")
 global cache
 cache = {}
 global textcache
@@ -48,7 +52,7 @@ global crunchcachecol
 crunchcachecol = {}
 global bigcrunchcache
 bigcrunchcache = {}
-
+print("getting more options")
 global scaled
 scaled = getattr(vars, "scaled", False)
 global scale
@@ -72,10 +76,11 @@ currentscene = 0
 #2 = live feed overlay
 
 maskcolor = (255, 0, 255)
-
+print("getting directories")
 assetdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 iconf = os.path.join(assetdir, "icon.bmp")
 global logo
+print("loading logo")
 logo = pg.image.load(iconf)
 pg.display.set_icon(logo)
 
@@ -87,6 +92,7 @@ graphicwidth = getattr(vars, "graphicalwidth", 840)
 gtz = getattr(vars, "timezone", "GMT")
 
 #TODO: figure out if what i figured out n does is correct
+print("getting rank")
 utn = dt.datetime.now(tz.UTC)
 rankid = utn.hour
 if rankid < 12:
@@ -183,18 +189,29 @@ def degrees_to_compass(degrees):
 
     return directions[index]
 
+print("initializing pygame")
 pg.init()
+print("done with pygame init")
 if not scaled:
+    print("making unscaled window")
     window = pg.display.set_mode((screenwidth, 768), pg.NOFRAME)
 else:
+    print("making fake window")
     window = pg.Surface((screenwidth, 768))
+    print("making actual window")
     final = pg.display.set_mode(scale)
+
+print("screensaver disabled")
 pg.display.set_allow_screensaver(False)
+
+print("mouse is invisible")
 pg.mouse.set_visible(False)
 
+print("caption set")
 pg.display.set_caption("LocalScan v1.1")
 
 if sound:
+    print("loading sound")
     daytheme = pg.mixer.Sound(vars.daytheme)
     nighttheme = pg.mixer.Sound(vars.nighttheme)
 
@@ -264,6 +281,9 @@ def getWeather():
         weatherend = r.get(f'https://api.weather.gov/points/{coords}', headers=rheaders).json()
     loadingstage=1
     loadingtext="Retrieving stations..."
+    forecastoffice = weatherend["properties"]["forecastOffice"]
+    headlineend = forecastoffice + "/headlines"
+    global headlines
     weatherendpoint1 = weatherend["properties"]["observationStations"]
     weatherendpoint2 = weatherend["properties"]["forecast"]
     weatherendpoint3 = weatherend["properties"]["forecastHourly"]
@@ -317,6 +337,8 @@ def getWeather():
             print(alertyy)
     global weathericons
     global weathericonbig
+    loadingtext = "Loading headlines..."
+    headlines = r.get(headlineend, headers=rheaders).json()["@graph"]
     loadingtext="Loading icons..."
     weathericons = [None for _ in range(14)]
     loadingstage=4
@@ -458,32 +480,54 @@ class RepeatTimer(th.Timer):
         while not self.finished.wait(self.interval):  
             self.function(*self.args,**self.kwargs)
 
+print("making timer")
 rrt = RepeatTimer(60, refreshWeather)
 rrt.daemon = True
 rrt.start()
+print("timer started")
 
-gradient = generateGradient((0, 80, 255), (0, 180,  255))
-gradientred = generateGradient((255, 0, 0), (255, 90, 0))
-topgradient = generateGradientHoriz((34, 139, 34), (124, 252, 0), h=64)
-bottomgradient = generateGradientHoriz((240, 128, 128), (178, 34, 34), h=64)
-bottomgradientred = generateGradientHoriz((0, 80, 255), (0, 180,  255), h=64)
+print("generating gradients")
+
+gradient_c = ((0, 80, 255), (0, 180,  255))
+gradient_redc = ((255, 0, 0), (255, 90, 0))
+topgradient_c = ((34, 139, 34), (124, 252, 0))
+bottomgradient_c = ((240, 128, 128), (178, 34, 34))
+bottomgradient_redc = ((0, 80, 255), (0, 180,  255))
+chartbg_c = ((0, 140, 255), (0, 40, 255))
+chartbg_darkc = ((140, 140, 140), (40, 40, 40))
+# gradient_c = ((136,231,136), (46,111,64))
+# gradient_redc = ((255, 0, 0), (255, 90, 0))
+# topgradient_c = ((205,28,24), (102,0,51))
+# bottomgradient_c = ((99,149,238), (39,39,87))
+# bottomgradient_redc = ((136,231,136), (46,111,64))
+# chartbg_c = ((136,231,136), (46,111,64))
+# chartbg_darkc = ((140, 140, 140), (40, 40, 40))
+
+gradient = generateGradient(*gradient_c)
+gradientred = generateGradient(*gradient_redc)
+topgradient = generateGradientHoriz(*topgradient_c, h=64)
+bottomgradient = generateGradientHoriz(*bottomgradient_c, h=64)
+bottomgradientred = generateGradientHoriz(*bottomgradient_redc, h=64)
+
 topshadow = generateGradient((127, 127, 127), (255, 255, 255), a1=127, a2=0, h=16)
 bottomshadow = generateGradient((255, 255, 255), (127, 127, 127), a1=127, a2=0, h=16)
 
-weekbg = generateGradient((0, 140, 255), (0, 40, 255), w=140, h=556)
-weekbg.blit(generateGradient((0, 40, 255), (0, 140,  255), w=130, h=546), (5, 5))
+weekbg = generateGradient(*chartbg_c, w=140, h=556)
+weekbg.blit(generateGradient(*reversed(chartbg_c), w=130, h=546), (5, 5))
 
-weekbgn = generateGradient((140, 140, 140), (40, 40, 40), w=140, h=556)
-weekbgn.blit(generateGradient((40, 40, 40), (140, 140,  140), w=130, h=546), (5, 5))
+weekbgn = generateGradient(*chartbg_darkc, w=140, h=556)
+weekbgn.blit(generateGradient(*reversed(chartbg_darkc), w=130, h=546), (5, 5))
 
-weekbgc = generateGradient((0, 140, 255), (0, 40, 255), w=140, h=276)
-weekbgc.blit(generateGradient((0, 40, 255), (0, 140,  255), w=130, h=266), (5, 5))
+weekbgc = generateGradient(*chartbg_c, w=140, h=276)
+weekbgc.blit(generateGradient(*reversed(chartbg_c), w=130, h=266), (5, 5))
 
-weekbgnc = generateGradient((140, 140, 140), (40, 40, 40), w=140, h=276)
-weekbgnc.blit(generateGradient((40, 40, 40), (140, 140,  140), w=130, h=266), (5, 5))
+weekbgnc = generateGradient(*chartbg_darkc, w=140, h=276)
+weekbgnc.blit(generateGradient(*reversed(chartbg_darkc), w=130, h=266), (5, 5))
 
-graphbg = generateGradient((0, 140, 255), (0, 40, 255), w=(994+screendiff), h=556)
-graphbg.blit(generateGradient((0, 40, 255), (0, 140, 255), w=(984+screendiff), h=546), (5, 5))
+graphbg = generateGradient(*chartbg_c, w=(994+screendiff), h=556)
+graphbg.blit(generateGradient(*reversed(chartbg_c), w=(984+screendiff), h=546), (5, 5))
+
+print("done making gradients")
 
 fontname = getattr(vars, "font", "Arial")
 bold = getattr(vars, "bold", True)
@@ -506,6 +550,7 @@ else:
     giganticfont = pg.font.Font(fontname, round(320 * sizemult))
 weatherth = th.Thread(target=getWeather, daemon=True)
 weatherth.start()
+print("weather thread started")
 
 def alphablit(surf, alpha, coord):
     transparent = pg.surface.Surface((surf.get_width(), surf.get_height())).convert_alpha()
@@ -837,129 +882,12 @@ def makehourlygraph():
     
     return surf, surf2, {"mintemp": mintemp, "maxtemp": maxtemp, "medtemp": medtemp}
 
-def formatMetric(metric):
-    if metric["value"] == None:
-        return 404
-    if metric["unitCode"] == "wmoUnit:degC":
-        return metric["value"]*1.8+32
-    elif metric["unitCode"] == "wmoUnit:km_h-1":
-        return metric["value"]/1.609
-    elif metric["unitCode"] == "wmoUnit:Pa":
-        return metric["value"]/3386
-    else:
-        return metric["value"]
-
-def handleNone(val):
-    return val if val != None else 0
-
-def roundd(val, precision):
-    if val in [None, "Error"]:
-        return "Error"
-    else:
-        return round(val, precision)
-
-def stripdss(array: list):
-    newar = array
-    if ".DS_Store" in newar:
-        newar.remove(".DS_Store")
-    return newar
-
-pg.event.pump()
-def main():
-    bottomtomorrow = False
-    working = True
-    playingmusic = 0
-    view = 0
-    alertscroll = 0
-    alertscrollbig = 0
-    alertshow = 0
-    showingalert = 0
-    alertdir = 1
-    alerttimer = 300
-    clock = pg.time.Clock()
-    night = False
-    nightv= False
-    music = None
-    shuffle = 0
-    redded = False
-    changetime = 60 * 15
-    justswitched = True
-    
-    ticker = 0
-    tickertimer = 60 * 4
-    
-    alerttimeout = 60 * 10
-    adindex = -1
-    scrollalert = False
-    alerttarget = 0
-    
-    currentscene = 0
-    
-    #cache
-    
-    #currently:
-    #hourlygraph
-    
-    
-    sections = 10
-    
-    try:
-        global loading
-        loading = True
-    except:
-        pass
-    while working:
-        delta = clock.tick(60) / 1000
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
-                working = False
-            if not loading:
-                if event.type == pg.MOUSEBUTTONDOWN:
-                    if event.button == pg.BUTTON_LEFT:
-                        bottomtomorrow += 1
-                        if bottomtomorrow > 13:
-                            bottomtomorrow = 0
-                        nightv += 1
-                        if nightv > 4:
-                            nightv = 0
-                        alertshow += 1
-                        if alertshow > len(alerts)-1:
-                            alertshow = 0
-                    elif event.button == pg.BUTTON_RIGHT:
-                        bottomtomorrow = 0
-                        alertshow = 0
-                        nightv = False
-                        view += 1
-                        if view > sections:
-                            view = 0
-                        if view == sections and len(alerts) > 0:
-                            changetime = 60 * 45
-                        else:
-                            changetime = 60 * 15
-                        justswitched = True
-                if event.type == pg.KEYDOWN:
-                    if event.key == pg.K_EQUALS:
-                        pg.display.toggle_fullscreen()
-                    if event.key == pg.K_MINUS:
-                        shuffle = 1
-                    if event.key == pg.K_9:
-                        pg.display.iconify()
-                    if event.key == pg.K_1:
-                        currentscene = 0
-                    if event.key == pg.K_2:
-                        currentscene = 2
-        if not working:
-            break
-        perfit = (True if not performance else justswitched)
-        if perfit:
-            window.blit(gradient if not redmode else gradientred, (0, 0))
-        if loading:
-            loadtext = bigfont.render(loadingtext, 1, (255, 255, 255, 255))
-            loadshadow = bigfont.render(loadingtext, 1, (0, 0, 0, 100))
-            alphablit(loadshadow, 127, (screenwidth/2-loadtext.get_width()/2+10, 384-loadtext.get_height()/2+10))
-            window.blit(loadtext, (screenwidth/2-loadtext.get_width()/2, 384-loadtext.get_height()/2))
-        elif currentscene == 2:
-            now = dt.datetime.now()
+def domusic(f=True):
+    global music
+    global shuffle
+    now = dt.datetime.now()
+    if True:
+        if True:
             if True:
                 if sound:
                     if wttr:
@@ -1012,6 +940,137 @@ def main():
                                 elif playingmusic == 2:
                                     daytheme.fadeout(1000)
                                     nighttheme.play(-1)
+
+def formatMetric(metric):
+    if metric["value"] == None:
+        return 404
+    if metric["unitCode"] == "wmoUnit:degC":
+        return metric["value"]*1.8+32
+    elif metric["unitCode"] == "wmoUnit:km_h-1":
+        return metric["value"]/1.609
+    elif metric["unitCode"] == "wmoUnit:Pa":
+        return metric["value"]/3386
+    else:
+        return metric["value"]
+
+def handleNone(val):
+    return val if val != None else 0
+
+def roundd(val, precision):
+    if val in [None, "Error"]:
+        return "Error"
+    else:
+        return round(val, precision)
+
+def stripdss(array: list):
+    newar = array
+    if ".DS_Store" in newar:
+        newar.remove(".DS_Store")
+    return newar
+
+print("pumping events")
+pg.event.pump()
+def main():
+    bottomtomorrow = False
+    working = True
+    playingmusic = 0
+    view = 0
+    alertscroll = 0
+    alertscrollbig = 0
+    alertshow = 0
+    showingalert = 0
+    alertdir = 1
+    alerttimer = 300
+    clock = pg.time.Clock()
+    night = False
+    nightv= False
+    global music
+    music = None
+    global shuffle
+    shuffle = 0
+    redded = False
+    changetime = 60 * 15
+    justswitched = True
+    
+    ticker = 0
+    tickertimer = 60 * 4
+    
+    alerttimeout = 60 * 10
+    adindex = -1
+    scrollalert = False
+    alerttarget = 0
+    
+    currentscene = 0
+    
+    #cache
+    
+    #currently:
+    #hourlygraph
+    
+    
+    sections = 11
+    print("main loop started")
+    
+    try:
+        global loading
+        loading = True
+    except:
+        pass
+    while working:
+        delta = clock.tick(60) / 1000
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                working = False
+            if not loading:
+                if event.type == pg.MOUSEBUTTONDOWN:
+                    if event.button == pg.BUTTON_LEFT:
+                        bottomtomorrow += 1
+                        if bottomtomorrow > 13:
+                            bottomtomorrow = 0
+                        nightv += 1
+                        if nightv > 4:
+                            nightv = 0
+                        alertshow += 1
+                        if alertshow > len(alerts)-1:
+                            alertshow = 0
+                    elif event.button == pg.BUTTON_RIGHT:
+                        bottomtomorrow = 0
+                        alertshow = 0
+                        nightv = False
+                        view += 1
+                        if view > sections:
+                            view = 0
+                        if view == sections and len(alerts) > 0:
+                            changetime = 60 * 45
+                        else:
+                            changetime = 60 * 15
+                        justswitched = True
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_EQUALS:
+                    pg.display.toggle_fullscreen()
+                if event.key == pg.K_MINUS:
+                    shuffle = 1
+                if event.key == pg.K_9:
+                    pg.display.iconify()
+                if event.key == pg.K_1:
+                    currentscene = 0
+                if event.key == pg.K_2:
+                    currentscene = 2
+                if event.key == pg.K_3:
+                    currentscene = 1
+        if not working:
+            break
+        perfit = (True if not performance else justswitched)
+        if perfit:
+            window.blit(gradient if not redmode else gradientred, (0, 0))
+        if loading:
+            loadtext = bigfont.render(loadingtext, 1, (255, 255, 255, 255))
+            loadshadow = bigfont.render(loadingtext, 1, (0, 0, 0, 100))
+            alphablit(loadshadow, 127, (screenwidth/2-loadtext.get_width()/2+10, 384-loadtext.get_height()/2+10))
+            window.blit(loadtext, (screenwidth/2-loadtext.get_width()/2, 384-loadtext.get_height()/2))
+        elif currentscene == 2:
+            now = dt.datetime.now()
+            domusic()
             obstime = dt.datetime.strptime(weather2["features"][0]["properties"]["timestamp"] + "UTC", "%Y-%m-%dT%H:%M:%S+00:00%Z")
             #obstimetemp = obstime.replace(tzinfo=tz.utc)
             #obstimetemp = obstimetemp.astimezone(tz.timezone(getattr(vars, "timezone", "UTC")))
@@ -1105,63 +1164,7 @@ def main():
                     view = sections
                     changetime = 60 * 30
                 redded = True
-            if True:
-                now = dt.datetime.now()
-                obstime = dt.datetime.strptime(weather2["features"][0]["properties"]["timestamp"] + "UTC", "%Y-%m-%dT%H:%M:%S+00:00%Z")
-                obstimetemp = obstime.replace(tzinfo=tz.utc)
-                obstimetemp = obstimetemp.astimezone(tz.timezone(getattr(vars, "timezone", "UTC")))
-                obstimeshort = splubby(obstime.strftime("%I:%M %p"))
-                if sound:
-                    if wttr:
-                        sunset = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunset"], timeformat)
-                        sunrise = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunrise"], timeformat)
-                    night = False
-                    if musicmode == "playlist":
-                        if not manualmusic:
-                            if music == None:
-                                musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(stripdss(os.listdir(playmusic)))))
-                                music = musicc.play()
-                            elif not music.get_busy():
-                                musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(stripdss(os.listdir(playmusic)))))
-                                music = musicc.play()
-                            if shuffle:
-                                shuffle = 0
-                                music.fadeout(1000)
-                                musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(stripdss(os.listdir(playmusic)))))
-                                music = musicc.play()
-                        else:
-                            if music == None:
-                                musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(stripdss(os.listdir(playmusic)))))
-                                music = musicc.play(-1)
-                            if shuffle:
-                                shuffle = 0
-                                music.fadeout(1000)
-                                musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(stripdss(os.listdir(playmusic)))))
-                                music = musicc.play(-1)
-                    else:
-                        if wttr:
-                            if now.hour > sunset.hour:
-                                night = True
-                            if now.hour < sunrise.hour:
-                                night = True
-                            if now.hour == sunrise.hour:
-                                if now.minute < sunrise.minute:
-                                    night = True
-                            if now.hour == sunset.hour:
-                                if now.minute > sunset.minute:
-                                    night = True
-                            if not playingmusic:
-                                daytheme.play(-1)
-                                playingmusic = True
-                        else:
-                            if (1 + night) != playingmusic:
-                                playingmusic = 1 + night
-                                if playingmusic == 1:
-                                    nighttheme.fadeout(1000)
-                                    daytheme.play(-1)
-                                elif playingmusic == 2:
-                                    daytheme.fadeout(1000)
-                                    nighttheme.play(-1)
+            domusic()
             periods = weather3["properties"]["periods"]
             currenttemp = giganticfont.render(f'{round(formatMetric(weather2["features"][0]["properties"]["temperature"]))}', 1, (255, 255, 255, 255))
             currentcondition = smallmedfont.render(weather2["features"][0]["properties"]["textDescription"], 1, (255, 255, 255, 255))
@@ -1397,12 +1400,20 @@ def main():
                 for city in range(len(travelcities)):
                     drawshadowtext(travelnames[city], smallmedfont, 5, 130 + city*45, 5)
                     temps = []
-                    for pd in travelweathers[city]["properties"]["periods"][0:24]:
-                        temps.append(round(float(pd["temperature"])))
+                    err = False
+                    try:
+                        for pd in travelweathers[city]["properties"]["periods"][0:24]:
+                            temps.append(round(float(pd["temperature"])))
+                    except:
+                        err = True
+                        temps = [0, 1000000]
                     lowt = min(temps)
                     hight = max(temps)
-                    drawshadowtempcol(f'Low: {lowt}°F', (135, 206, 235), smallmedfont, screenwidth - 550, 130 + city*45, 5)
-                    drawshadowtextcol(f'High: {hight}°F', (255, 140, 0), smallmedfont, screenwidth - 250, 130 + city*45, 5)
+                    if not err:
+                        drawshadowtempcol(f'Low: {lowt}°F', (135, 206, 235), smallmedfont, screenwidth - 550, 130 + city*45, 5)
+                        drawshadowtextcol(f'High: {hight}°F', (255, 140, 0), smallmedfont, screenwidth - 250, 130 + city*45, 5)
+                    else:
+                        drawshadowtempcol(f'Data Error', (255, 0, 0), smallmedfont, screenwidth - 550, 130 + city*45, 5)
             elif view == 5 and perfit:
                 drawshadowbigcrunch("\n".join(wraptext(f'{periods[0]["name"]}...{periods[0]["detailedForecast"]}', pg.Rect(15, 128, 994+screendiff, 588+32), smallmedfont)), (255, 255, 255), smallmedfont, 15, 128, 5, 994+screendiff, 588+32, 127)
             elif view == 6 and perfit:
@@ -1436,6 +1447,26 @@ def main():
                     window.blit(buffer, (screenwidth/2-hurricaneimage.get_width()/2+5, 800/2-hurricaneimage.get_height()/2+5), special_flags=pg.BLEND_RGBA_MULT)
                     window.blit(hurricaneimage, (screenwidth/2-hurricaneimage.get_width()/2, 800/2-hurricaneimage.get_height()/2))
             elif view == 10 and perfit:
+                headlines_cleaned = []
+                headline_titles = []
+                
+                for hl in headlines:
+                    headlines_cleaned.append(re.sub('<[^<]+?>', '', hl["content"]))
+                    headline_titles.append(hl["title"])
+                lasth = 0
+                for tl in range(len(headline_titles)):
+                    times = headlines[tl]["issuanceTime"].split("T")[0]
+                    link = headlines[tl]["link"]
+                    buff = pg.Surface((screenwidth-30, 3))
+                    buff.fill((0, 0, 0))
+                    buff = pg.transform.gaussian_blur(expandSurface(buff, 6), 4)
+                    window.blit(buff, (0+2+15, lasth + 160 - 10), special_flags=pg.BLEND_RGBA_MULT)
+                    pg.draw.line(window, (127, 127, 127), (0+15, 160 + lasth - 12), (screenwidth-15, 160 + lasth - 12), 3)
+                    drawshadowtextcol(link, (127, 255, 255), smallfont, 15, 160 + lasth - 12 - smallfont.size(link)[1]/2, 5, 127)
+                    drawshadowtextcol(times, (255, 255, 255), smallfont, screenwidth - 15 - smallfont.size(times)[0], 160 + lasth - 12 - smallfont.size(times)[1]/2, 5, 127)
+                    last = drawshadowtext("\n".join(wraptext(headlines_cleaned[tl], pg.Rect(0, 0, screenwidth-10, 768), smallishfont)), smallishfont, 5, 160 + (lasth), 5, 127)
+                    lasth += (last.get_height() + 24)
+            elif view == 11 and perfit:
                 if justswitched:
                     alertscrollbig = 0
                     alerttimeout = 60 * 10
@@ -1519,6 +1550,8 @@ def main():
                 tickertimer -= 60 * delta
             
             tickerright = ""
+            obstime = dt.datetime.strptime(weather2["features"][0]["properties"]["timestamp"] + "UTC", "%Y-%m-%dT%H:%M:%S+00:00%Z")
+            obstimeshort = splubby(obstime.strftime("%I:%M %p"))
             if ticker == 0:
                 tickername = f'Last updated at {obstimeshort} UTC'
             elif ticker == 1:
@@ -1568,7 +1601,7 @@ def main():
                     window.blit(topgradient, (0, 460))
                     drawshadowtext(periods[bottomtomorrow]["name"].upper(), smallmedfont, 5, 465, 5, 127)
             
-            viewnames = ["Split View", "Overview", "7-Day Forecast", "Hourly Graph", "Travel Cities", f"Weather Report ({periods[0]['name']})", f"Weather Report ({periods[1]['name']})", f"Weather Report ({periods[2]['name']})", "Temperature Forecast" if not redmode else "Severe Weather Rader", "Probability of Precipitation" if not trackhurricanes else "Hurricane Tracker", "Alerts"]
+            viewnames = ["Split View", "Overview", "7-Day Forecast", "Hourly Graph", "Travel Cities", f"Weather Report ({periods[0]['name']})", f"Weather Report ({periods[1]['name']})", f"Weather Report ({periods[2]['name']})", "Temperature Forecast" if not redmode else "Severe Weather Rader", "Probability of Precipitation" if not trackhurricanes else "Hurricane Tracker", "Forecast Office Headlines", "Alerts"]
             viewName = viewnames[view]
             if view == 2:
                 #force view 2
@@ -1615,5 +1648,5 @@ except Exception as err:
             elif event.type == pg.MOUSEBUTTONDOWN:
                 work = False
         window.blit(gradientred, (0, 0))
-        drawshadowtext(err.__str__(), smallfont, 15, 15, 5)
+        drawshadowtext(err.__repr__(), smallfont, 15, 15, 5)
         pg.display.flip()

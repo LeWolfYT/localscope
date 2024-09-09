@@ -42,6 +42,10 @@ graphicalscale = 0.9
 ```
 Right now, you can use this template as vars.py, changing the paths if needed.
 
+## Segments
+
+Right now, you can press the 1 key to show the normal weather and the 2 key to start overlay mode. Set your chroma key to magenta for it to work. In OBS, a similarity value of 200 works best.
+
 ## Contributing
 
 This project is in **very active** development and any and all contributions are welcome! I'll be making it a goal to label some of my spaghetti code to make contributing easier.
