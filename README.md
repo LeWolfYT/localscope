@@ -39,6 +39,11 @@ graphicalwidth = 840
 graphicalscale = 0.9
 #change depending on image height. keep in mind that you have around 640px of vertical space and 1000px of horizontal space
 #for the contiguous usa, 840 works fine
+
+#for background images (set to false for gradient)
+background_image_use = True
+background = "/path/to/img.jpg"
+backgroundred = "/path/to/redimg.jpg"
 ```
 Right now, you can use this template as vars.py, changing the paths if needed.
 
