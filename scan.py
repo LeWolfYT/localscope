@@ -21,10 +21,19 @@ actime = getattr(vars, "adcrawltime", 4)
 travelcities = getattr(vars, "travelcities", ["KATL", "KBOS", "KORD", "KDFW", "KDEN", "KDTW", "KLAX", "KNYC", "KMCO", "KSFO", "KSEA", "KDCA"])
 
 performance = getattr(vars, "performance", False)
+usebg = getattr(vars, "background_image_use", False)
+
+bgimage = None
+bgimager = None
+if usebg:
+    bgimage = pg.image.load(vars.background)
+    bgimager = pg.image.load(getattr(vars, "backgroundred", vars.background))
 
 screenwidth = 1366
 
 screendiff = screenwidth - 1024
+
+transitions = True
 
 debug = False
 print(f"debug draw mode: {debug}")
@@ -1062,7 +1071,13 @@ def main():
             break
         perfit = (True if not performance else justswitched)
         if perfit:
-            window.blit(gradient if not redmode else gradientred, (0, 0))
+            if not usebg:
+                window.blit(gradient if not redmode else gradientred, (0, 0))
+            else:
+                if smoothsc:
+                    window.blit(pg.transform.smoothscale(bgimage if not redmode else bgimager, (screenwidth, 768)), (0, 0))
+                else:
+                    window.blit(pg.transform.scale(bgimage if not redmode else bgimager, (screenwidth, 768)), (0, 0))
         if loading:
             loadtext = bigfont.render(loadingtext, 1, (255, 255, 255, 255))
             loadshadow = bigfont.render(loadingtext, 1, (0, 0, 0, 100))
@@ -1097,12 +1112,8 @@ def main():
                     alerttimer = 300
                     if showingalert > len(alerts)-1:
                         showingalert = 0
-                if not redmode:
-                    drawshadowcrunchcol(alerts[showingalert]["properties"]["headline"], (255, 0, 0), smallmedfont, 5 + alertscroll, 80, 5, screenwidth-15, 127)
-                else:
-                    drawshadowcrunchcol(alerts[showingalert]["properties"]["headline"], (0, 127, 255), smallmedfont, 5 + alertscroll, 80, 5, screenwidth-15, 127)
                 if len(alerts) > 1:
-                    drawshadowcrunchcol(alerts[(showingalert+1) if showingalert != len(alerts)-1 else 0]["properties"]["headline"], (255, 0, 0), smallmedfont, -1019 + alertscroll, 80, 5, 1024-15, 127)
+                    drawshadowcrunchcol(alerts[(showingalert+1) if showingalert != len(alerts)-1 else 0]["properties"]["headline"], (255, 0, 0) if not redmode else (0, 127, 255), smallmedfont, -1019 + alertscroll, 80, 5, 1024-15, 127)
             else:
                 drawshadowtext(currentdate, smallmedfont, 5, 704-64+5, 5, 127)
                 drawshadowtext(currenttime, smallmedfont, screenwidth - 5 - smallmedfont.size(currenttime)[0], 704-64+5, 5, 127)
@@ -1466,7 +1477,7 @@ def main():
                     drawshadowtextcol(times, (255, 255, 255), smallfont, screenwidth - 15 - smallfont.size(times)[0], 160 + lasth - 12 - smallfont.size(times)[1]/2, 5, 127)
                     last = drawshadowtext("\n".join(wraptext(headlines_cleaned[tl], pg.Rect(0, 0, screenwidth-10, 768), smallishfont)), smallishfont, 5, 160 + (lasth), 5, 127)
                     lasth += (last.get_height() + 24)
-            elif view == 11 and perfit:
+            elif view == 11:
                 if justswitched:
                     alertscrollbig = 0
                     alerttimeout = 60 * 10
@@ -1488,6 +1499,14 @@ def main():
                         if scrollalert:
                             if performance:
                                 if alertdir == 1:
+                                    if len(alerts) > 1:
+                                        alertshow += 1
+                                        if alertshow > len(alerts)-1:
+                                            view = 0
+                                            justswitched = 1
+                                            changetime = 60 * 15
+                                        else:
+                                            changetime = 60 * 30
                                     if alertscrollbig < alerttarget:
                                         alertscrollbig += 300
                                         alerttimeout = 60 * 5
@@ -1509,6 +1528,14 @@ def main():
                                         alertdir = 1
                             else:
                                 if alertdir == 1:
+                                    if len(alerts) > 1:
+                                        alertshow += 1
+                                        if alertshow > len(alerts)-1:
+                                            view = 0
+                                            justswitched = 1
+                                            changetime = 60 * 15
+                                        else:
+                                            changetime = 60 * 30
                                     if alertscrollbig < alerttarget:
                                         alertscrollbig += 60 * delta
                                     else:
