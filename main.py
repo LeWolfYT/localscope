@@ -85,7 +85,7 @@ def degrees_to_compass(degrees):
     return directions[index]
 
 pg.init()
-window = pg.display.set_mode((1024, 768))
+window = pg.display.set_mode((1024, 768), flags=pg.NOFRAME)
 pg.display.set_caption("My Weather Station")
 
 if sound:

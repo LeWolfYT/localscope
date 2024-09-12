@@ -58,4 +58,35 @@ This project is in **very active** development and any and all contributions are
 ## Versions
 
 There are currently two versions of the app. Version 1 is found in main.py, and ws4k.py is version 2. Version 1 is the main version, and version 2 is where I experiment with things a bit more. Please use version 1.
-Recently, we've added a "Version 1.1" of sorts in the form of the LocalScan program (scan.py). If you want to live stream, use that!
+A little while ago, we added a "Version 1.1" of sorts in the form of the LocalScope program (scan.py). If you want to live stream, use that! Also check out the official live stream at live.mistweather.com!
+
+## Custom Images
+
+In vars.py, you are able to set images to be used in place of certain gradients.
+The information on image sizes will be laid out here.
+Note that images WILL NOT be scaled automatically, unlike custom backgrounds.
+
+Gradients (by geometry):
+
+(Screen width)x64 (default 1366x64)
+`topgradient`
+`bottomgradient`
+`bottomgradientred`
+
+140x276
+`weekbgc` (Extended Forecast chart, normal version)
+`weekbgnc` (Extended Forecast chart, night)
+
+(Screen width - 30)x556 (default 1336x556)
+`graphbg` (Hourly Graph chart)
+
+### How to add:
+
+```py
+image_replace = {
+    "topgradient", "path/to/image.png",
+    "bottomgradient", "path/to/image2.png"
+}
+```
+
+and so on for every replacement.
