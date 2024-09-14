@@ -951,10 +951,6 @@ def domusic(warn=False):
                             if now.hour == sunset.hour:
                                 if now.minute > sunset.minute:
                                     night = True
-                            if not playingmusic:
-                                daytheme.play(-1)
-                                playingmusic = True
-                        else:
                             if (1 + night) != playingmusic:
                                 playingmusic = 1 + night
                                 if playingmusic == 1:
