@@ -1,4 +1,4 @@
-# My Weather Station
+# LocalScope
 
 Do you like the Wii Forecast Channel? Maybe The Weather Channel's older WeatherStar units? Maybe you just want a fun way of checking the weather? Look no further! (#TODO: Remind me to add some more info here.)
 

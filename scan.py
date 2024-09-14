@@ -289,6 +289,9 @@ def getWeather():
         else:
             coords = input("coordinates: ")
         weatherend = r.get(f'https://api.weather.gov/points/{coords}', headers=rheaders).json()
+    global sunrises
+    sunrises = r.get(f"https://api.sunrisesunset.io/json?lat={coords.split(',')[0]}&lng={coords.split(',')[1]}").json()
+    
     loadingstage=1
     loadingtext="Retrieving stations..."
     forecastoffice = weatherend["properties"]["forecastOffice"]
@@ -897,17 +900,21 @@ def makehourlygraph():
     
     return surf, surf2, {"mintemp": mintemp, "maxtemp": maxtemp, "medtemp": medtemp}
 
-def domusic(f=True):
+def domusic(warn=False):
+    if not sound:
+        return
     global music
     global shuffle
     now = dt.datetime.now()
-    if True:
+    if not warn:
         if True:
             if True:
                 if sound:
-                    if wttr:
-                        sunset = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunset"], timeformat)
-                        sunrise = dt.datetime.strptime(weather["weather"][0]["astronomy"][0]["sunrise"], timeformat)
+                    def egr(st):
+                        if len(st) < 11:
+                            return "0" + st
+                    sunset = dt.datetime.strptime(egr(sunrises["results"]["sunset"]), "%I:%M:%S %p")
+                    sunrise = dt.datetime.strptime(egr(sunrises["results"]["sunrise"]), "%I:%M:%S %p")
                     night = False
                     if musicmode == "playlist":
                         if not manualmusic:
@@ -932,7 +939,8 @@ def domusic(f=True):
                                 musicc = pg.mixer.Sound(os.path.join(playmusic, rd.choice(stripdss(os.listdir(playmusic)))))
                                 music = musicc.play(-1, fade_ms=1000)
                     else:
-                        if wttr:
+                        global playingmusic
+                        if True:
                             if now.hour > sunset.hour:
                                 night = True
                             if now.hour < sunrise.hour:
@@ -955,6 +963,12 @@ def domusic(f=True):
                                 elif playingmusic == 2:
                                     daytheme.fadeout(1000)
                                     nighttheme.play(-1, fade_ms=1000)
+    else:
+        if musicmode == "playlist":
+            music.fadeout(1000)
+        else:
+            daytheme.fadeout(1000)
+            nighttheme.fadeout(1000)
 
 def formatMetric(metric):
     if metric["value"] == None:
@@ -988,6 +1002,7 @@ pg.event.pump()
 def main():
     bottomtomorrow = False
     working = True
+    global playingmusic
     playingmusic = 0
     view = 0
     alertscroll = 0
@@ -1014,6 +1029,8 @@ def main():
     adindex = -1
     scrollalert = False
     alerttarget = 0
+    name = ""
+    overridetime = 0
     
     currentscene = 0
     
@@ -1073,6 +1090,20 @@ def main():
                     currentscene = 2
                 if event.key == pg.K_3:
                     currentscene = 1
+                if event.key == pg.key.key_code("e"):
+                    try:
+                        os.mkdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "export"))
+                    except:
+                        pass
+                    pg.image.save(gradient, os.path.join(os.path.dirname(os.path.abspath(__file__)), "export", "gradient.png"))
+                    pg.image.save(gradientred, os.path.join(os.path.dirname(os.path.abspath(__file__)), "export", "gradientred.png"))
+                    pg.image.save(topgradient, os.path.join(os.path.dirname(os.path.abspath(__file__)), "export", "topgradient.png"))
+                    pg.image.save(bottomgradient, os.path.join(os.path.dirname(os.path.abspath(__file__)), "export", "bottomgradient.png"))
+                    pg.image.save(weekbgc, os.path.join(os.path.dirname(os.path.abspath(__file__)), "export", "weekbgc.png"))
+                    pg.image.save(weekbgnc, os.path.join(os.path.dirname(os.path.abspath(__file__)), "export", "weekbgnc.png"))
+                    pg.image.save(graphbg, os.path.join(os.path.dirname(os.path.abspath(__file__)), "export", "graphbg.png"))
+                    overridetime = 5 * 60
+                    name = "Exported gradients successfully!"
         if not working:
             break
         perfit = (True if not performance else justswitched)
@@ -1648,6 +1679,9 @@ def main():
             if view == 2:
                 #force view 2
                 viewName = ["7-Day Forecast (Day)", "7-Day Forecast (Night)", "7-Day Forecast (Page 1)", "7-Day Forecast (Page 2)", "Extended Forecast"][nightv]
+            if overridetime > 0:
+                overridetime -= 60 * delta
+                viewName = name
             drawshadowtext(viewName, smallmedfont, screenwidth/2-smallmedfont.size(viewName)[0]/2, 5, 5, 127)
             drawshadowtext(splubby(dt.datetime.now().strftime(timeformattop)), smallmedfont, 5, 5, 5, 127)
             #drawshadowtext(clock.get_fps(), smallmedfont, 5, 5, 5, 127)
@@ -1675,6 +1709,9 @@ def main():
             else:
                 final.blit(pg.transform.scale(window, scale), (0, 0))
         pg.display.flip()
+
+if not getattr(pg, "IS_CE", False):
+    raise ModuleNotFoundError("Pygame CE is required for this application! Please uninstall Pygame and install Pygame CE instead.")
 
 try:
     main()
