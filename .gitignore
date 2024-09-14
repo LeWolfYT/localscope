@@ -1,2 +1,7 @@
 vars.py
-__pycache__/**
+varsd.py
+__pycache__/**/
+__pycache__/
+build/
+export/
+ogg/
