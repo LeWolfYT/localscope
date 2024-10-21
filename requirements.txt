@@ -1,3 +1,4 @@
 pygame-ce
 pytz
 isodate
+map_tile_stitcher
