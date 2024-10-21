@@ -44,6 +44,9 @@ graphicalscale = 0.9
 background_image_use = True
 background = "/path/to/img.jpg"
 backgroundred = "/path/to/redimg.jpg"
+
+apikey='KEY GOES HERE'
+extendedfamount = 18 #how many days+nights of extended forecast to show. keep this even please.
 ```
 Right now, you can use this template as vars.py, changing the paths if needed.
 
