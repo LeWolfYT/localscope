@@ -8,6 +8,7 @@ from io import BytesIO
 import isodate as it
 import pytz as tz
 import vars as varr
+import json
 import os
 import random as rd
 import time
@@ -40,6 +41,8 @@ screenwidth = 1366
 
 tilesneededw = math.ceil(screenwidth / 256) // 2 * 2 + 1
 tilesneededh = 3
+
+loadingtasks = []
 
 screendiff = screenwidth - 1024
 
@@ -85,7 +88,7 @@ global partnerlogo
 partnerlogo = getattr(varr, "logo", None)
 
 rheaders = {
-    "User-Agent": "(lewolfyt.github.io, ciblox3+myweatherstation@gmail.com)"
+    "User-Agent": "(lewolfyt.github.io, localscope+ciblox3@gmail.com)"
 }
 
 global currentscene
@@ -218,14 +221,23 @@ def degrees_to_compass(degrees):
 print("initializing pygame")
 pg.init()
 print("done with pygame init")
+
 if not scaled:
     print("making unscaled window")
-    window = pg.display.set_mode((screenwidth, 768), pg.NOFRAME)
+    realwindow = pg.Window("LocalScope v1.4", (screenwidth, 768))
+    realwindow.borderless = True
+    window = realwindow.get_surface()
 else:
     print("making fake window")
     window = pg.Surface((screenwidth, 768))
     print("making actual window")
-    final = pg.display.set_mode(scale)
+    realwindow = pg.Window("LocalScope v1.4", scale)
+    final = realwindow.get_surface()
+
+realops = pg.Window("LocalScope - Admin Panel", (640, 480))
+
+opswindow = realops.get_surface()
+
 transition_s = pg.Surface((window.get_width(), window.get_height()))
 
 print("screensaver disabled")
@@ -234,8 +246,9 @@ pg.display.set_allow_screensaver(False)
 print("mouse is invisible")
 pg.mouse.set_visible(False)
 
-print("caption set")
-pg.display.set_caption("LocalScope v1.3")
+#print("caption set")
+#pg.display.set_caption("LocalScope v1.4")
+print("LocalScope v1.4 - The Worldwide Update")
 
 if sound:
     print("loading sound")
@@ -255,6 +268,23 @@ def generateGradient(col1, col2, w=screenwidth, h=768, a1=255, a2=255):
         surface.blit(transpar, (0, i), special_flags=pg.BLEND_RGBA_MULT)
     return surface.convert_alpha()
 
+blurmode = getattr(varr, "blurmode", "gaussian")
+
+def blur(surf: pg.Surface, radius):
+    if blurmode == "box":
+        return pg.transform.box_blur(surf, radius)
+    elif blurmode == "gaussian":
+        return pg.transform.gaussian_blur(surf, radius)
+    elif blurmode == "dropshadow":
+        
+        transparent = pg.Surface((surf.get_width(), surf.get_height())).convert_alpha()
+        transparent.fill((255, 255, 255, 0.5))
+        transparent.blit(surf, (0, 0), special_flags=pg.BLEND_RGBA_MULT)
+        
+        return transparent
+    else:
+        return pg.Surface((1, 1))
+
 def turnintoashadow(surf: pg.Surface, shadow=127):
     newsurf = pg.Surface((surf.get_width(), surf.get_height())).convert_alpha()
     newsurf.fill((0, 0, 0, 0))
@@ -262,7 +292,7 @@ def turnintoashadow(surf: pg.Surface, shadow=127):
     black = pg.Surface((surf.get_width(), surf.get_height())).convert_alpha()
     black.fill((0, 0, 0, shadow))
     newsurf.blit(black, (0, 0), special_flags=pg.BLEND_RGBA_MULT)
-    newsurf = pg.transform.gaussian_blur(expandSurfaceAlpha(newsurf, 6), 4)
+    newsurf = blur(expandSurfaceAlpha(newsurf, 6), 4)
     return newsurf
 
 def generateGradientHoriz(col1, col2, w=screenwidth, h=768, a1=255, a2=255):
@@ -281,15 +311,42 @@ def fallback(val, fallback):
 apikey = varr.apikey
 unites = getattr(varr, "units", "e")
 
+#temp unit
+t = "F" if unites == "e" else "C"
+
+#kmph?
+kmp = "" if unites == "e" else "k"
+kmpb = "" if unites == "e" else "K"
+
+#pressure
+pres = "inHg" if unites == "e" else "mbar"
+pres_s = "in." if unites == "e" else "mbar"
+
+#visibility
+visi = "miles" if unites == "e" else "kilometers"
+
+#precip
+prec = "inches" if unites == "e" else "millimeters"
+
+locl = getattr(varr, "locale", "en-US")
+
+lang = {}
+langf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lang", locl) + ".json"
+
+if not os.path.exists(langf):
+    langf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lang", "en-US") + ".json"
+
+with open(langf, "r") as f:
+    lang = json.loads(f.read())
+
 def getWeather():
     
-    global loadingtext
     global loadingstage
     global redmode
     global coords
     redmode = False
     loadingstage=0
-    loadingtext="Loading..."
+    loadingtasks.append("Gathering initial data...")
     if True:
         if getattr(varr, "coords", False):
             coords = getattr(varr, "coords")
@@ -305,51 +362,75 @@ def getWeather():
     basetile = msc.get_index_from_coordinate(ms.Coordinate(float(coords.split(",")[0]), float(coords.split(",")[1])), zoom)
     
     loadingstage=1
-    loadingtext="Retrieving stations..."
-    forecastoffice = weatherend["properties"]["forecastOffice"]
-    headlineend = forecastoffice + "/headlines"
+    
     global headlines
-    weatherendpoint3 = weatherend["properties"]["forecastHourly"]
-    weatherendpoint4 = f'https://api.weather.com/v3/wx/forecast/hourly/2day?geocode={coords}&units=e&language=en-US&format=json&format=json&apiKey={apikey}'
-    observationend = f"https://api.weather.com/v3/wx/observations/current?geocode={coords}&units={unites}&language=en-US&format=json&apiKey={apikey}"
-    print(observationend)
-    stationname = "Temporary"
-    print(stationname)
+    weatherendpoint4 = f'https://api.weather.com/v3/wx/forecast/hourly/2day?geocode={coords}&units={unites}&language={locl}&format=json&format=json&apiKey={apikey}'
+    observationend = f"https://api.weather.com/v3/wx/observations/current?geocode={coords}&units={unites}&language={locl}&format=json&apiKey={apikey}"
+    
     global weather2 # current
     loadingstage=2
-    loadingtext="Retrieving current\nconditions..."
-    weather2 = r.get(observationend).json()
-    loadingtext="Retrieving current\ntravel conditions..."
+    loadingtasks.remove("Gathering initial data...")
+    
+    def getcc():
+        global weather2
+        loadingtasks.append("Retrieving current conditions...")
+        weather2 = r.get(observationend).json()
+        loadingtasks.remove("Retrieving current conditions...")
+    th.Thread(target=getcc).start()
+    
+    
     global travelweathers
     global travelnames
     travelweathers = []
     travelnames = []
-    for city in range(len(travelcities)):
-        citystationinf = r.get(f'https://api.weather.com/v3/location/point?icaoCode={travelcities[city]}&language=en-US&format=json&apiKey={apikey}').json()
-        cityw = r.get(f'https://api.weather.com/v3/wx/forecast/hourly/2day?icaoCode={travelcities[city]}&units=e&language=en-US&format=json&format=json&apiKey={apikey}').json()
-        travelweathers.append(cityw)
-        realname = citystationinf["location"]["displayName"]
-        travelnames.append(realname)
-    travelnames = getattr(vars, "travelnames", ["Atlanta", "Boston", "Chicago", "Dallas/Ft. Worth", "Denver", "Detroit", "Los Angeles", "New York City", "Orlando", "San Francisco", "Seattle", "Washington D.C."])
-    loadingtext="Retrieving station\ninformation..."
-    global stationinfo
-    stationinfo = r.get(f'https://api.weather.gov/stations/{stationname}/', headers=rheaders).json()
+    def gettc():
+        loadingtasks.append("Retrieving current travel conditions...")
+        global travelweathers
+        global travelnames
+        for city in range(len(travelcities)):
+            citystationinf = r.get(f'https://api.weather.com/v3/location/point?icaoCode={travelcities[city]}&language={locl}&format=json&apiKey={apikey}').json()
+            cityw = r.get(f'https://api.weather.com/v3/wx/forecast/hourly/2day?icaoCode={travelcities[city]}&units={unites}&language={locl}&format=json&format=json&apiKey={apikey}').json()
+            travelweathers.append(cityw)
+            realname = citystationinf["location"]["displayName"]
+            travelnames.append(realname)
+        travelnames = getattr(vars, "travelnames", ["Atlanta", "Boston", "Chicago", "Dallas/Ft. Worth", "Denver", "Detroit", "Los Angeles", "New York City", "Orlando", "San Francisco", "Seattle", "Washington D.C."])
+        loadingtasks.remove("Retrieving current travel conditions...")
+    th.Thread(target=gettc).start()
     global realstationname
-    realstationname = r.get(f'https://api.weather.com/v3/location/point?geocode={coords}&language=en-US&format=json&apiKey={apikey}').json()["location"]["city"]
+    def getsi():
+        loadingtasks.append("Retrieving station information...")
+        global realstationname
+        realstationname = r.get(f'https://api.weather.com/v3/location/point?geocode={coords}&language={locl}&format=json&apiKey={apikey}').json()["location"]["city"]
+        loadingtasks.remove("Retrieving station information...")
+    th.Thread(target=getsi).start()
+    
     global weather3 # forecast
-    loadingtext="Retrieving forecast..."
-    loadingstage=3
-    weeklyend = f"https://api.weather.com/v3/wx/forecast/daily/10day?geocode={coords}&units={unites}&language=en-US&format=json&apiKey={apikey}"
-    weather3 = r.get(weeklyend).json()
-    global weather4
-    weather4 = r.get(weatherendpoint3, headers=rheaders).json()
+    
+    def getef():
+        global weather3
+        loadingtasks.append("Retrieving extended forecast...")
+        weeklyend = f"https://api.weather.com/v3/wx/forecast/daily/10day?geocode={coords}&units={unites}&language={locl}&format=json&apiKey={apikey}"
+        weather3 = r.get(weeklyend).json()
+        global bottomtomorrowm
+        bottomtomorrowm = (weather3["daypart"][0]["daypartName"][0] == None)
+        loadingtasks.remove("Retrieving extended forecast...")
+    th.Thread(target=getef).start()
+    
     global weatherraw
-    weatherraw = r.get(weatherendpoint4).json()
-    loadingtext="Retrieving weather\nconfigurations..."
+    def getrw():
+        loadingtasks.append("Retrieving hourly forecast...")
+        global weatherraw
+        weatherraw = r.get(weatherendpoint4).json()
+        loadingtasks.remove("Retrieving hourly forecast...")
+    th.Thread(target=getrw).start()
+    
     global alerts
-    loadingtext="Retrieving alerts..."
-    if True:
-        alertyy = r.get(f'https://api.weather.com/v3/alerts/headlines?geocode={coords}&format=json&language=en-US&apiKey={apikey}', headers=rheaders)
+    def getal():
+        global trackhurricanes
+        global redmode
+        global alerts
+        loadingtasks.append("Retrieving alerts...")
+        alertyy = r.get(f'https://api.weather.com/v3/alerts/headlines?geocode={coords}&format=json&language={locl}&apiKey={apikey}', headers=rheaders)
         
         if alertyy.status_code not in [404, 204]:
             print("status", alertyy.status_code)
@@ -360,138 +441,171 @@ def getWeather():
             alerts = alertyy["alerts"]
         except:
             print(alertyy)
+        global alert_details
+        alert_details = []
+        for alert in alerts:
+            print(alert["certainty"])
+            print(alert["urgency"])
+            alert_details.append(
+                r.get(f"https://api.weather.com/v3/alerts/detail?alertId={alert['detailKey']}&format=json&language={locl}&apiKey={apikey}").json()["alertDetail"]["texts"][0]["description"]
+            )
+            if not alert["certainty"] in ["Observed", "Likely"]:
+                continue
+            if not alert["urgency"] in ["Immediate", "Expected"]:
+                continue
+            redmode = True
+            if "hurricane" in alert["headlineText"].lower():
+                trackhurricanes = True
+        loadingtasks.remove("Retrieving alerts...")
+    th.Thread(target=getal).start()
+    
     global weathericons
     global weathericonbig
-    loadingtext = "Loading headlines..."
-    headlines = r.get(headlineend, headers=rheaders).json()["@graph"]
-    loadingtext="Loading icons..."
-    weathericons = [None for _ in range(22)]
-    loadingstage=4
-    global bottomtomorrowm
-    bottomtomorrowm = (weather3["daypart"][0]["daypartName"][0] == None)
-    icdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "twc")
-    icss = {}
-    for image in os.listdir(icdir):
-        if image == ".DS_Store":
-            continue
-        icss[image] = pg.image.load(os.path.join(icdir,image))
+    def getic():
+        global weathericons
+        global weathericonbig
+        loadingtasks.append("Loading icons...")
+        weathericons = [None for _ in range(22)]
     
-    for i in range(22):
-        if bottomtomorrowm and i == 0:
-            continue
-        if smoothsc:
-            weathericons[i] = pg.transform.smoothscale(icss[str(weather3["daypart"][0]["iconCode"][i])+".png"], (128, 128))
-        else:
-            weathericons[i] = pg.transform.scale(icss[str(weather3["daypart"][0]["iconCode"][i])+".png"], (128, 128))
-        
-    if smoothsc:
-        weathericonbig = pg.transform.smoothscale(icss[str(weather3["daypart"][0]["iconCode"][0+bottomtomorrowm])+".png"], (192, 192))
-    else:
-        weathericonbig = pg.transform.scale(icss[str(weather3["daypart"][0]["iconCode"][0+bottomtomorrowm])+".png"], (192, 192))
-
-    loadingtext="Loading images..."
-    global mappy
-    global trackhurricanes
-    trackhurricanes = False
-    global radarimage
-    radarimage = pg.image.load(BytesIO(r.get(warnsurl, headers=rheaders).content))
-    global hurricaneimage
-    hurricaneimage = pg.image.load(BytesIO(r.get(f"https://www.nhc.noaa.gov/xgtwo/two_{getattr(varr, 'hurricanesector', 'pac').lower()}_0d0.png", headers=rheaders).content))
+        icdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "twc")
+        icss = {}
+        for image in os.listdir(icdir):
+            if image == ".DS_Store":
+                continue
+            icss[image] = pg.image.load(os.path.join(icdir,image))
     
-    tilestart = ms.GridIndex(basetile.x - math.floor(tilesneededw/2), basetile.y - math.floor(tilesneededh/2), zoom)
-    tileend = ms.GridIndex(basetile.x + math.ceil(tilesneededw/2), basetile.y + math.ceil(tilesneededh/2), zoom)
-    
-    mappy_temp = [[] for _ in range(abs(tilestart.x - tileend.x))]
-    
-    tilesneededx = list(range(tilestart.x, tileend.x+1))
-    tilesneededy = list(range(tilestart.y, tileend.y+1))
-    
-    global ppa
-    ppa = r.get(f"https://api.weather.com/v3/TileServer/series/productSet/PPAcore?apiKey={apikey}").json()
-    
-    global mappy_heat
-    global mappy_precip
-    global timestam
-    
-    osmtiles = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-    twctiles_heat = "https://api.weather.com/v3/TileServer/tile/satradFcst?ts={ts}&fts={fts}&xyz={x}:{y}:{z}&apiKey=" + apikey
-    twctiles_precip = "https://api.weather.com/v3/TileServer/tile/precip24hrFcst?ts={ts}&fts={fts}&xyz={x}:{y}:{z}&apiKey=" + apikey
-    twch_temp = [[[] for _ in range(5)] for _ in range(abs(tilestart.x - tileend.x))]
-    twpc_temp = [[[] for _ in range(5)] for _ in range(abs(tilestart.x - tileend.x))]
-    
-    try:
-        os.mkdir(os.path.join(cachedir, "cache"))
-    except:
-        pass
-    
-    realcache = os.path.join(cachedir, "cache")
-    
-    timestam = [[], []]
-    
-    for i in range(abs(tilestart.x - tileend.x)):
-        for j in range(abs(tilestart.y - tileend.y)):
-            url = osmtiles.format(z=zoom, x=tilesneededx[i], y=tilesneededy[j])
-            
-            if not os.path.exists(os.path.join(realcache, f"{zoom}_{tilesneededx[i]}_{tilesneededy[j]}.png")):
-                ee = r.get(url, headers=rheaders).content
-                mappy_temp[i].append(pg.image.load(BytesIO(ee)))
-                with open(os.path.join(realcache, f"{zoom}_{tilesneededx[i]}_{tilesneededy[j]}.png"), "wb") as ff:
-                    ff.write(ee)
+        for i in range(22):
+            if bottomtomorrowm and i == 0:
+                continue
+            if smoothsc:
+                weathericons[i] = pg.transform.smoothscale(icss[str(weather3["daypart"][0]["iconCode"][i])+".png"], (128, 128))
             else:
-                mappy_temp[i].append(pg.image.load(os.path.join(realcache, f"{zoom}_{tilesneededx[i]}_{tilesneededy[j]}.png")))
-            #if tilesneededx[i] == basetile.x:
-            #        if tilesneededy[j] == basetile.y:
-            #            pg.image.save(mappy_temp[i][-1], os.path.join(realcache, f"{zoom}_{tilesneededx[i]}_{tilesneededy[j]}_thisisit.png"))
-            base1 = ppa["seriesInfo"]["tempFcst"]["series"][0]
-            base2 = ppa["seriesInfo"]["satradFcst"]["series"][0]
-            for k in range(5):
-                ht = twctiles_heat.format(ts=base1["ts"], fts=base1["fts"][-(k+1)], z=zoom, x=tilesneededx[i], y=tilesneededy[j])
-                pc = twctiles_precip.format(ts=base2["ts"], fts=base2["fts"][-(k+1)], z=zoom, x=tilesneededx[i], y=tilesneededy[j])
-                print("h ts ", dt.datetime.fromtimestamp(base1["ts"]))
-                print("h fts ", dt.datetime.fromtimestamp(base1["fts"][-(k+1)]))
-                print("p ts ", dt.datetime.fromtimestamp(base1["ts"]))
-                print("p fts ", dt.datetime.fromtimestamp(base1["fts"][-(k+1)]))
-                eh = r.get(ht, headers=rheaders).content
-                twch_temp[i][k].append(pg.image.load(BytesIO(eh)))
-                ep = r.get(pc, headers=rheaders).content
-                twpc_temp[i][k].append(pg.image.load(BytesIO(ep)))
-                timestam[0].append(dt.datetime.fromtimestamp(base1["fts"][-(k+1)]))
-                timestam[1].append(dt.datetime.fromtimestamp(base2["fts"][-(k+1)]))
-    mappy = pg.Surface((256 * tilesneededw, 256*tilesneededh))
-    mappy_heat = [pg.Surface((256 * tilesneededw, 256*tilesneededh)) for _ in range(5)]
-    mappy_precip = [pg.Surface((256 * tilesneededw, 256*tilesneededh)) for _ in range(5)]
-    mappy = pg.Surface((256 * tilesneededw, 256*tilesneededh))
-    for i in range(len(mappy_temp)):
-        for j in range(len(mappy_temp[i])):
-            mappy.blit(mappy_temp[i][j], (i*256, j*256))
-            for k in range(5):
-                mappy_heat[k].blit(twch_temp[i][k][j], (i*256, j*256))
-                mappy_precip[k].blit(twpc_temp[i][k][j], (i*256, j*256))
-    for k in range(5):
-        mappy_heat[k].set_alpha(round(255/6*5))
-        mappy_precip[k].set_alpha(round(255/6*5))
+                weathericons[i] = pg.transform.scale(icss[str(weather3["daypart"][0]["iconCode"][i])+".png"], (128, 128))
+        
+        if smoothsc:
+            weathericonbig = pg.transform.smoothscale(icss[str(weather3["daypart"][0]["iconCode"][0+bottomtomorrowm])+".png"], (192, 192))
+        else:
+            weathericonbig = pg.transform.scale(icss[str(weather3["daypart"][0]["iconCode"][0+bottomtomorrowm])+".png"], (192, 192))
+        loadingtasks.remove("Loading icons...")
+    th.Thread(target=getic).start()
+    def getim():
+        loadingtasks.append("Loading images...")
+        global mappy
+        global trackhurricanes
+        trackhurricanes = False
+        global radarimage
+        radarimage = pg.image.load(BytesIO(r.get(warnsurl, headers=rheaders).content))
+        global hurricaneimage
+        hurricaneimage = pg.image.load(BytesIO(r.get(f"https://www.nhc.noaa.gov/xgtwo/two_{getattr(varr, 'hurricanesector', 'pac').lower()}_0d0.png", headers=rheaders).content))
+
+        tilestart = ms.GridIndex(basetile.x - math.floor(tilesneededw/2), basetile.y - math.floor(tilesneededh/2), zoom)
+        tileend = ms.GridIndex(basetile.x + math.ceil(tilesneededw/2), basetile.y + math.ceil(tilesneededh/2), zoom)
+
+        mappy_temp = [[] for _ in range(abs(tilestart.x - tileend.x))]
+
+        tilesneededx = list(range(tilestart.x, tileend.x+1))
+        tilesneededy = list(range(tilestart.y, tileend.y+1))
+
+        global ppa
+        ppa = r.get(f"https://api.weather.com/v3/TileServer/series/productSet/PPAcore?apiKey={apikey}").json()
+
+        global mappy_heat
+        global mappy_precip
+        global timestam
+
+        osmtiles = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        twctiles_heat = "https://api.weather.com/v3/TileServer/tile/satradFcst?ts={ts}&fts={fts}&xyz={x}:{y}:{z}&apiKey=" + apikey
+        twctiles_precip = "https://api.weather.com/v3/TileServer/tile/precip24hrFcst?ts={ts}&fts={fts}&xyz={x}:{y}:{z}&apiKey=" + apikey
+        twch_temp = [[[] for _ in range(5)] for _ in range(abs(tilestart.x - tileend.x))]
+        twpc_temp = [[[] for _ in range(5)] for _ in range(abs(tilestart.x - tileend.x))]
+
+        try:
+            os.mkdir(os.path.join(cachedir, "cache"))
+        except:
+            pass
+        
+        realcache = os.path.join(cachedir, "cache")
+
+        timestam = [[], []]
+        def premap():
+            for i in range(abs(tilestart.x - tileend.x)):
+                for j in range(abs(tilestart.y - tileend.y)):
+                    url = osmtiles.format(z=zoom, x=tilesneededx[i], y=tilesneededy[j])
+                    
+                    if not os.path.exists(os.path.join(realcache, f"{zoom}_{tilesneededx[i]}_{tilesneededy[j]}.png")):
+                        ee = r.get(url, headers=rheaders).content
+                        mappy_temp[i].append(pg.image.load(BytesIO(ee)))
+                        with open(os.path.join(realcache, f"{zoom}_{tilesneededx[i]}_{tilesneededy[j]}.png"), "wb") as ff:
+                            ff.write(ee)
+                    else:
+                        mappy_temp[i].append(pg.image.load(os.path.join(realcache, f"{zoom}_{tilesneededx[i]}_{tilesneededy[j]}.png")))
+        global maphdone
+        maphdone = False
+        def getmaph():
+            for i in range(abs(tilestart.x - tileend.x)):
+                for j in range(abs(tilestart.y - tileend.y)):
+                    base1 = ppa["seriesInfo"]["tempFcst"]["series"][0]
+                    for k in range(5):
+                        ht = twctiles_heat.format(ts=base1["ts"], fts=base1["fts"][-(k+1)], z=zoom, x=tilesneededx[i], y=tilesneededy[j])
+                        eh = r.get(ht, headers=rheaders).content
+                        twch_temp[i][k].append(pg.image.load(BytesIO(eh)))
+                        print("h ts ", dt.datetime.fromtimestamp(base1["ts"]))
+                        print("h fts ", dt.datetime.fromtimestamp(base1["fts"][-(k+1)]))
+                        timestam[0].append(dt.datetime.fromtimestamp(base1["fts"][-(k+1)]))
+            global maphdone
+            maphdone = False
+        global mappdone
+        mappdone = False
+        def getmapp():
+            for i in range(abs(tilestart.x - tileend.x)):
+                for j in range(abs(tilestart.y - tileend.y)):
+                    base2 = ppa["seriesInfo"]["satradFcst"]["series"][0]
+                    for k in range(5):
+                        pc = twctiles_precip.format(ts=base2["ts"], fts=base2["fts"][-(k+1)], z=zoom, x=tilesneededx[i], y=tilesneededy[j])
+                        ep = r.get(pc, headers=rheaders).content
+                        twpc_temp[i][k].append(pg.image.load(BytesIO(ep)))
+                        print("p ts ", dt.datetime.fromtimestamp(base2["ts"]))
+                        print("p fts ", dt.datetime.fromtimestamp(base2["fts"][-(k+1)]))
+                        timestam[1].append(dt.datetime.fromtimestamp(base2["fts"][-(k+1)]))
+            global mappdone
+            mappdone = False
+        
+        premapt = th.Thread(target=premap)
+        mapht = th.Thread(target=getmaph)
+        mappt = th.Thread(target=getmapp)
+        premapt.start()
+        mapht.start()
+        mappt.start()
+        
+        premapt.join()
+        mapht.join()
+        mappt.join()
+        
+        print("maps done")
+        mappy = pg.Surface((256 * tilesneededw, 256*tilesneededh))
+        mappy_heat = [pg.Surface((256 * tilesneededw, 256*tilesneededh)) for _ in range(5)]
+        mappy_precip = [pg.Surface((256 * tilesneededw, 256*tilesneededh)) for _ in range(5)]
+        mappy = pg.Surface((256 * tilesneededw, 256*tilesneededh))
+        for i in range(len(mappy_temp)):
+            for j in range(len(mappy_temp[i])):
+                mappy.blit(mappy_temp[i][j], (i*256, j*256))
+                for k in range(5):
+                    mappy_heat[k].blit(twch_temp[i][k][j], (i*256, j*256))
+                    mappy_precip[k].blit(twpc_temp[i][k][j], (i*256, j*256))
+        for k in range(5):
+            mappy_heat[k].set_alpha(round(255/6*5))
+            mappy_precip[k].set_alpha(round(255/6*5))
+        loadingtasks.remove("Loading images...")
+    th.Thread(target=getim).start()
     
     if partnered:
-        loadingtext = "Loading your logo..."
+        loadingtasks.append("Loading your logo...")
         global logosurf
         logosurf = pg.image.load(partnerlogo)
-    global alert_details
-    alert_details = []
-    for alert in alerts:
-        print(alert["certainty"])
-        print(alert["urgency"])
-        alert_details.append(
-            r.get(f"https://api.weather.com/v3/alerts/detail?alertId={alert['detailKey']}&format=json&language=en-US&apiKey={apikey}").json()["alertDetail"]["texts"][0]["description"]
-        )
-        if not alert["certainty"] in ["Observed", "Likely"]:
-            continue
-        if not alert["urgency"] in ["Immediate", "Expected"]:
-            continue
-        redmode = True
-        if "hurricane" in alert["headlineText"].lower():
-            trackhurricanes = True
+        loadingtasks.remove("Loading your logo...")
     
-    
+    while len(loadingtasks) > 0:
+        pass
     
     global loading
     loading = False
@@ -517,8 +631,8 @@ def refreshWeather():
     headlineend = forecastoffice + "/headlines"
     global headlines
     weatherendpoint3 = weatherend["properties"]["forecastHourly"]
-    weatherendpoint4 = f'https://api.weather.com/v3/wx/forecast/hourly/2day?geocode={coords}&units=e&language=en-US&format=json&format=json&apiKey={apikey}'
-    observationend = f"https://api.weather.com/v3/wx/observations/current?geocode={coords}&units={unites}&language=en-US&format=json&apiKey={apikey}"
+    weatherendpoint4 = f'https://api.weather.com/v3/wx/forecast/hourly/2day?geocode={coords}&units={unites}&language={locl}&format=json&format=json&apiKey={apikey}'
+    observationend = f"https://api.weather.com/v3/wx/observations/current?geocode={coords}&units={unites}&language={locl}&format=json&apiKey={apikey}"
     print(observationend)
     stationname = "Temporary"
     print(stationname)
@@ -529,19 +643,17 @@ def refreshWeather():
     travelweathers = []
     travelnames = []
     for city in range(len(travelcities)):
-        citystationinf = r.get(f'https://api.weather.com/v3/location/point?icaoCode={travelcities[city]}&language=en-US&format=json&apiKey={apikey}').json()
-        cityw = r.get(f'https://api.weather.com/v3/wx/forecast/hourly/2day?icaoCode={travelcities[city]}&units=e&language=en-US&format=json&format=json&apiKey={apikey}').json()
+        citystationinf = r.get(f'https://api.weather.com/v3/location/point?icaoCode={travelcities[city]}&language={locl}&format=json&apiKey={apikey}').json()
+        cityw = r.get(f'https://api.weather.com/v3/wx/forecast/hourly/2day?icaoCode={travelcities[city]}&units={unites}&language={locl}&format=json&format=json&apiKey={apikey}').json()
         travelweathers.append(cityw)
         realname = citystationinf["location"]["displayName"]
         travelnames.append(realname)
     travelnames = getattr(vars, "travelnames", ["Atlanta", "Boston", "Chicago", "Dallas/Ft. Worth", "Denver", "Detroit", "Los Angeles", "New York City", "Orlando", "San Francisco", "Seattle", "Washington D.C."])
 
-    global stationinfo
-    stationinfo = r.get(f'https://api.weather.gov/stations/{stationname}/', headers=rheaders).json()
     global realstationname
-    realstationname = r.get(f'https://api.weather.com/v3/location/point?geocode={coords}&language=en-US&format=json&apiKey={apikey}').json()["location"]["city"]
+    realstationname = r.get(f'https://api.weather.com/v3/location/point?geocode={coords}&language={locl}&format=json&apiKey={apikey}').json()["location"]["city"]
     global weather3 # forecast
-    weeklyend = f"https://api.weather.com/v3/wx/forecast/daily/10day?geocode={coords}&units={unites}&language=en-US&format=json&apiKey={apikey}"
+    weeklyend = f"https://api.weather.com/v3/wx/forecast/daily/10day?geocode={coords}&units={unites}&language={locl}&format=json&apiKey={apikey}"
     weather3 = r.get(weeklyend).json()
     global weather4
     weather4 = r.get(weatherendpoint3, headers=rheaders).json()
@@ -549,7 +661,7 @@ def refreshWeather():
     weatherraw = r.get(weatherendpoint4).json()
     global alerts
     if True:
-        alertyy = r.get(f'https://api.weather.com/v3/alerts/headlines?geocode={coords}&format=json&language=en-US&apiKey={apikey}', headers=rheaders)
+        alertyy = r.get(f'https://api.weather.com/v3/alerts/headlines?geocode={coords}&format=json&language={locl}&apiKey={apikey}', headers=rheaders)
         
         if alertyy.status_code not in [404, 204]:
             print("status", alertyy.status_code)
@@ -605,7 +717,7 @@ def refreshWeather():
         print(alert["certainty"])
         print(alert["urgency"])
         alert_details.append(
-            r.get(f"https://api.weather.com/v3/alerts/detail?alertId={alert['detailKey']}&format=json&language=en-US&apiKey={apikey}").json()["alertDetail"]["texts"][0]["description"]
+            r.get(f"https://api.weather.com/v3/alerts/detail?alertId={alert['detailKey']}&format=json&language={locl}&apiKey={apikey}").json()["alertDetail"]["texts"][0]["description"]
         )
         if not alert["certainty"] in ["Observed", "Likely"]:
             continue
@@ -796,7 +908,7 @@ def expandSurfaceAlpha(surf, expansion):
     newsurf.blit(surf, (expansion, expansion))
     return newsurf
 
-def drawshadowtext(text, size, x, y, offset, shadow=127, totala=255):
+def drawshadowtext(text, size, x, y, offset, shadow=127, totala=255, wind=window):
     text = str(text)
     usecache = True
     if text in textcache:
@@ -816,7 +928,7 @@ def drawshadowtext(text, size, x, y, offset, shadow=127, totala=255):
     if not usecache:
         textn = size.render(text, 1, (255, 255, 255, 0))
         textsh = size.render(text, 1, (shadow/1.5, shadow/1.5, shadow/1.5, shadow))
-        textsh = pg.transform.gaussian_blur(expandSurface(textsh, 6), 4)
+        textsh = blur(expandSurface(textsh, 6), 4)
         
         if totala != 255:
             buf = pg.Surface((textsh.get_width(), textsh.get_height()))
@@ -836,11 +948,11 @@ def drawshadowtext(text, size, x, y, offset, shadow=127, totala=255):
             textcache[text][size].append(textbland)
     
     if totala != 255:
-        window.blit(textsh, (x+offset, y+offset), special_flags=pg.BLEND_RGBA_MULT)
-        alphablit(textn, totala, (x, y))
+        wind.blit(textsh, (x+offset, y+offset), special_flags=pg.BLEND_RGBA_MULT)
+        alphablit2(textn, totala, (x, y), wind)
     else:
-        window.blit(textsh, (x+offset, y+offset), special_flags=pg.BLEND_RGBA_MULT)
-        window.blit(textn, (x, y))
+        wind.blit(textsh, (x+offset, y+offset), special_flags=pg.BLEND_RGBA_MULT)
+        wind.blit(textn, (x, y))
     return textbland
 
 def drawshadowtemp(temp, size: pg.font.Font, x, y, offset, shadow=127):
@@ -861,7 +973,7 @@ def drawshadowtemp(temp, size: pg.font.Font, x, y, offset, shadow=127):
         if len(temp) == 3:
             textn = pg.transform.smoothscale_by(textn, (2/3, 1))
             textsh = pg.transform.smoothscale_by(textsh, (2/3, 1))
-        textsh = pg.transform.gaussian_blur(expandSurface(textsh, 6), 4)
+        textsh = blur(expandSurface(textsh, 6), 4)
         if not temp in tempcache:
             tempcache[temp] = {}
         tempcache[temp][size] = []
@@ -876,7 +988,7 @@ def drawshadowcrunch(text, size: pg.font.Font, x, y, offset, targetWidth, shadow
     if size.size(str(text))[0] > targetWidth:
         textn = pg.transform.smoothscale(textn, (targetWidth, size.size(text)[1]))
         textsh = pg.transform.smoothscale(textsh, (targetWidth, size.size(text)[1]))
-    textsh = pg.transform.gaussian_blur(expandSurface(textsh, 6), 4)
+    textsh = blur(expandSurface(textsh, 6), 4)
     window.blit(textsh, (x+offset, y+offset), special_flags=pg.BLEND_RGBA_MULT)
     window.blit(textn, (x, y))
     return textn
@@ -909,7 +1021,7 @@ def drawshadowtextcol(text, col, size, x, y, offset, shadow=127):
     if not usecache:
         textn = size.render(text, 1, col)
         textsh = size.render(text, 1, (shadow/1.5, shadow/1.5, shadow/1.5, shadow))
-        textsh = pg.transform.gaussian_blur(expandSurface(textsh, 6), 4)
+        textsh = blur(expandSurface(textsh, 6), 4)
         window.blit(textsh, (x+offset, y+offset), special_flags=pg.BLEND_RGBA_MULT)
         window.blit(textn, (x, y))
         if text in textcachecol:
@@ -932,7 +1044,7 @@ def drawshadowcrunchcol(text, col, size, x, y, offset, targetWidth, shadow=127):
     if size.size(text)[0] > targetWidth:
         textn = pg.transform.smoothscale(textn, (targetWidth, size.size(text)[1]))
         textsh = pg.transform.smoothscale(textsh, (targetWidth, size.size(text)[1]))
-    textsh = pg.transform.gaussian_blur(expandSurface(textsh, 6), 4)
+    textsh = blur(expandSurface(textsh, 6), 4)
     window.blit(textsh, (x+offset, y+offset), special_flags=pg.BLEND_RGBA_MULT)
     window.blit(textn, (x, y))
     return size.render(text, 1, (255, 255, 255, 255))
@@ -975,7 +1087,7 @@ def drawshadowbigcrunch(text, col, size, x, y, offset, targetWidth, targetHeight
         if textn.get_height() > targetHeight:
             textn = pg.transform.smoothscale_by(textn, (1, targetHeight/textn.get_height()))
             textsh = pg.transform.smoothscale_by(textsh, (1, targetHeight/textsh.get_height()))
-        textsh = pg.transform.gaussian_blur(expandSurface(textsh, 6), 4)
+        textsh = blur(expandSurface(textsh, 6), 4)
         if text in bigcrunchcache:
             if size in bigcrunchcache[text]:
                 if not col in bigcrunchcache[text][size]:
@@ -1016,7 +1128,7 @@ def drawshadowtempcol(temp, col, size: pg.font.Font, x, y, offset, shadow=127):
         if len(temp) == 3:
             textn = pg.transform.smoothscale_by(textn, (2/3, 1))
             textsh = pg.transform.smoothscale_by(textsh, (2/3, 1))
-        textsh = pg.transform.gaussian_blur(expandSurface(textsh, 6), 4)
+        textsh = blur(expandSurface(textsh, 6), 4)
         if temp in tempcachecol:
             if size in tempcachecol[temp]:
                 if not col in tempcachecol[temp][size]:
@@ -1120,9 +1232,15 @@ def makehourlygraph():
     for i in range(24):
         pg.draw.line(surf, (255, 0, 0), (mapnum(0, 24, 0, w, i), mapnum(maxtemp, mintemp, 0, h-6, temps[i])), (mapnum(0, 24, 0, w, i+1), mapnum(maxtemp, mintemp, 0, h-6, temps[i+1])), 3)
     
-    surf2 = pg.transform.gaussian_blur(expandSurface(surf2, 6), 4)
+    surf2 = blur(expandSurface(surf2, 6), 4)
     
     return surf, surf2, {"mintemp": mintemp, "maxtemp": maxtemp, "medtemp": medtemp}
+
+def trail(num):
+    ln = str(num)
+    if len(ln) < 2:
+        return "0" + ln
+    return ln
 
 def domusic(warn=False):
     if not sound:
@@ -1255,6 +1373,8 @@ def main():
     name = ""
     overridetime = 0
     
+    showfps = False
+    
     currentscene = 0
     #logotex = sdl.Texture.from_surface()
     #cache
@@ -1317,6 +1437,10 @@ def main():
                     currentscene = 2
                 if event.key == pg.K_3:
                     currentscene = 1
+                if event.key == pg.key.key_code("f"):
+                    showfps = not showfps
+                    overridetime = 5 * 60
+                    name = "Toggled FPS View!"
                 if event.key == pg.key.key_code("e"):
                     try:
                         os.mkdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "export"))
@@ -1348,14 +1472,15 @@ def main():
             angl += 5 * math.sin(math.pi * math.sin(loadingd/10))
             lgs = pg.transform.rotozoom(logo, angl - 45, math.log(loadingd/100+0.1))
             window.blit(lgs, (screenwidth/2-lgs.get_width()/2, (768/2)-lgs.get_height()/2))
-            loadtext = bigfont.render(loadingtext, 1, (255, 255, 255, 255))
-            loadshadow = bigfont.render(loadingtext, 1, (0, 0, 0, 100))
-            alphablit(loadshadow, 127, (screenwidth/2-loadtext.get_width()/2+10, 710-loadtext.get_height()))
-            window.blit(loadtext, (screenwidth/2-loadtext.get_width()/2, 700-loadtext.get_height()))
+            
+            loadtext = smallmedfont.render("Current tasks:\n" + "\n".join(loadingtasks), 1, (255, 255, 255, 255))
+            loadshadow = smallmedfont.render("Current tasks:\n" + "\n".join(loadingtasks), 1, (0, 0, 0, 100))
+            alphablit(loadshadow, 127, (5+7, 5+7))
+            window.blit(loadtext, (5, 5))
         elif currentscene == 2:
             now = dt.datetime.now()
             domusic()
-            obstime = dt.datetime.strptime(weather2["validTimeLocal"].split("-")[0], "%Y-%m-%dT%H:%M:%S")
+            obstime = dt.datetime.strptime("-".join(weather2["validTimeLocal"].split("-")[:-1]), "%Y-%m-%dT%H:%M:%S")
             #obstimetemp = obstime.replace(tzinfo=tz.utc)
             #obstimetemp = obstimetemp.astimezone(tz.timezone(getattr(varr, "timezone", "UTC")))
             #obstimeshort = splubby(obstimetemp.strftime("%I:%M %p"))
@@ -1403,31 +1528,31 @@ def main():
             
             tickerright = ""
             if ticker == 0:
-                tickername = f'Last updated at {obstimeshort} UTC'
+                tickername = f'Last updated at {obstimeshort}'
                 tickername = f'Current conditions for {realstationname}'
             elif ticker == 1:
-                tickername = f'Temperature: {round(weather2["temperature"])}°F'
-                tickerright = f'Feels Like: {round(weather2["temperatureFeelsLike"])}°F'
+                tickername = f'{lang["temp"]}: {round(weather2["temperature"])}°{t}'
+                tickerright = f'{lang["feels"]}: {round(weather2["temperatureFeelsLike"])}°{t}'
             elif ticker == 2:
-                tickername = f'Humidity: {roundd(weather2["relativeHumidity"])}%'
-                tickerright = f'UV Index: {round(weather2["uvIndex"])}'
+                tickername = f'{lang["humid"]}: {roundd(weather2["relativeHumidity"])}%'
+                tickerright = f'{lang["uv"]}: {round(weather2["uvIndex"])}'
             elif ticker == 3:
                 pressa = ["(-)", "(+)", "(-)", "(++)", "(--)"]
-                tickername = f'Barometric Pressure: {round(weather2["pressureAltimeter"], 2)} in. {pressa[weather2["pressureTendencyCode"]]}'
+                tickername = f'{lang["pressure"]}: {round(weather2["pressureAltimeter"], 2)} {pres_s} {pressa[weather2["pressureTendencyCode"]]}'
             elif ticker == 4:
                 if weather2["windDirectionCardinal"] != "CALM":
-                    tickername = f'Wind: {weather2["windDirectionCardinal"]} @ {round(weather2["windSpeed"])} mph'
+                    tickername = f'{lang["wind"]}: {weather2["windDirectionCardinal"]} @ {round(weather2["windSpeed"])} {kmp}mph'
                 else:
-                    tickername = "Wind: Calm"
+                    tickername = f"{lang['wind']}: {lang['calm']}"
                 if weather2["windGust"]:
-                    tickerright = f"Gusts: {weather2['windGust']}"
+                    tickerright = f"{lang['gusts']}: {weather2['windGust']}"
             elif ticker == 5:
                 try:
                     ceiling = nonezero(weather2["cloudCeiling"])
                 except IndexError:
                     ceiling = 0
-                tickername = f'Visibility: {round(weather2["visibility"])} miles'
-                tickerright = f'Ceiling: {"Unlimited" if ceiling == 0 else f"{ceiling} feet"}'
+                tickername = f'{lang["visib"]}: {round(weather2["visibility"])} {visi}'
+                tickerright = f'{lang["ceil"]}: {"Unlimited" if ceiling == 0 else f"{ceiling} feet"}'
             elif ticker == 6:
                 tickername = ads[adindex]
             drawshadowtext(tickername, smallmedfont, 5, 768-64+5, 5, 127)
@@ -1440,8 +1565,8 @@ def main():
                 redded = True
             domusic()
             periods = weather3["daypart"][0]
-            currenttemp = giganticfont.render(f'{round(weather2["temperature"])}', 1, (255, 255, 255, 255))
-            currentcondition = smallmedfont.render(weather2["wxPhraseShort"], 1, (255, 255, 255, 255))
+            currenttemp = giganticfont.render(f'{trail(round(weather2["temperature"]))}', 1, (255, 255, 255, 255))
+            currentcondition = smallmedfont.render(weather2["wxPhraseLong"], 1, (255, 255, 255, 255))
             #top bar
             
             # window.blit(topshadow, (0, 64), special_flags=pg.BLEND_RGBA_MULT)
@@ -1495,7 +1620,7 @@ def main():
                     if len(alerts) > 1:
                         drawshadowcrunchcol(alerts[(showingalert+1) if showingalert != len(alerts)-1 else 0]["headlineText"], (255, 0, 0), smallmedfont, -1019 + alertscroll, 80, 5, 1024-15, 127)
                 else:
-                    drawshadowtext("No active alerts in your area.", smallmedfont, 5, 80, 5, 127)
+                    drawshadowtext(lang["noalert"], smallmedfont, 5, 80, 5, 127)
             # current
             
             perfit = (True if not performance else justswitched)
@@ -1506,21 +1631,21 @@ def main():
                     precip = "0"
                 else:
                     precip = str(round(precip/25.4, 1))
-                currenttemp = drawshadowtemp(round(weather2["temperature"]), giganticfont, 60, 80, 20, 180)
-                drawshadowtext("°F", bigfont, currenttemp.get_width()+60, 125, 10, 160)
+                currenttemp = drawshadowtemp(trail(round(weather2["temperature"])), giganticfont, 60, 80, 20, 180)
+                drawshadowtext(f"°{t}", bigfont, currenttemp.get_width()+60, 125, 10, 160)
                 if weather2["windDirectionCardinal"] != "CALM":
                     #print(weather2["features"][0]["properties"]["windSpeed"])
-                    drawshadowtext(f'Wind: {weather2["windDirectionCardinal"]} @ {round((weather2["windSpeed"]))} MPH', smallmedfont, 540, 125, 5, 127)
+                    drawshadowtext(f'{lang["wind"]}: {weather2["windDirectionCardinal"]} @ {round((weather2["windSpeed"]))} {kmpb}MPH', smallmedfont, 540, 125, 5, 127)
                 else:
-                    drawshadowtext('Wind: Calm', smallmedfont, 540, 125, 5, 127)
-                drawshadowtext(f'Relative Humidity: {roundd(weather2["relativeHumidity"], 1)}%', smallmedfont, 540, 175, 5, 127)
-                drawshadowtext(f'Precipitation: {precip} inches', smallmedfont, 540, 225, 5, 127)
-                drawshadowtext(f'Visibility: {round(weather2["visibility"], 1)} miles', smallmedfont, 540, 275, 5, 127)
-                drawshadowtext(f'Feels Like: {round(weather2["temperatureFeelsLike"])}°F', smallmedfont, 540, 325, 5, 127)
+                    drawshadowtext(f'{lang["wind"]}: {lang["calm"]}', smallmedfont, 540, 125, 5, 127)
+                drawshadowtext(f'{lang["relhumid"]}: {roundd(weather2["relativeHumidity"], 1)}%', smallmedfont, 540, 175, 5, 127)
+                drawshadowtext(f'{lang["precip"]}: {precip} {prec}', smallmedfont, 540, 225, 5, 127)
+                drawshadowtext(f'{lang["visib"]}: {round(weather2["visibility"], 1)} {visi}', smallmedfont, 540, 275, 5, 127)
+                drawshadowtext(f'{lang["feels"]}: {round(weather2["temperatureFeelsLike"])}°{t}', smallmedfont, 540, 325, 5, 127)
                 
                 pressa = ["(-)", "(+)", "(-)", "(++)", "(--)"]
                 
-                drawshadowtext(f'Air pressure: {roundd(weather2["pressureAltimeter"], 2)} inHg {pressa[weather2["pressureTendencyCode"]]}', smallmedfont, 540, 375, 5, 127)
+                drawshadowtext(f'{lang["pressure"]}: {roundd(weather2["pressureAltimeter"], 2)} {pres} {pressa[weather2["pressureTendencyCode"]]}', smallmedfont, 540, 375, 5, 127)
                 #window.blit(currenttemp, (60, 80))
                 offsetw = -currentcondition.get_width()/2
                 if offsetw < -220:
@@ -1534,29 +1659,29 @@ def main():
                 if view == 0:
                     #tomorrow
                     # forecasted temps
-                    tm1 = drawshadowtemp(periods["temperature"][bottomtomorrow], bigfont, 60, 560, 10, 140)
+                    tm1 = drawshadowtemp(trail(periods["temperature"][bottomtomorrow]), bigfont, 60, 560, 10, 140)
                     #tm2 = drawshadowtempcol(periods["temperatureMin"][bottomtomorrow], (135, 206, 250), medfont, 280, 540, 7, 127)
                     #tm3 = drawshadowtempcol(periods["temperatureMax"][bottomtomorrow], (255, 140, 0), medfont, 280, 610, 7, 127)
-                    drawshadowtext("°F", bigfont, tm1.get_width()+60, 560, 10, 140)
-                    #drawshadowtextcol("°F", (135, 206, 250, 255), medfont, tm2.get_width()+280, 540, 10, 140)
-                    #drawshadowtextcol("°F", (255, 140, 0, 255), medfont, tm3.get_width()+280, 610, 10, 140)
+                    drawshadowtext(f"°{t}", bigfont, tm1.get_width()+60, 560, 10, 140)
+                    #drawshadowtextcol(f"°{t}", (135, 206, 250, 255), medfont, tm2.get_width()+280, 540, 10, 140)
+                    #drawshadowtextcol(f"°{t}", (255, 140, 0, 255), medfont, tm3.get_width()+280, 610, 10, 140)
                     buffer = pg.Surface((128, 128))
                     pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 128, 128))
-                    buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                    buffer = blur(expandSurface(buffer, 6), 4)
                     window.blit(buffer, (tm1.get_width() + 190, 560), special_flags=pg.BLEND_RGBA_MULT)
                     window.blit(weathericons[bottomtomorrow], (tm1.get_width() + 180, 550))
                     # other metrics
                     prval = periods["precipChance"][bottomtomorrow]
                     if prval == None:
                         prval = "0"
-                    drawshadowtext(f'Precipitation Chance: {prval}%', smallmedfont, 440, 540, 5, 127)
-                    drawshadowtext(f'Wind: {periods["windDirectionCardinal"][bottomtomorrow]} @ {periods["windSpeed"][bottomtomorrow]}', smallmedfont, 440, 590, 5, 127)
+                    drawshadowtext(f'{lang["precipchance"]}: {prval}%', smallmedfont, 440, 540, 5, 127)
+                    drawshadowtext(f'{lang["wind"]}: {periods["windDirectionCardinal"][bottomtomorrow]} @ {periods["windSpeed"][bottomtomorrow]}', smallmedfont, 440, 590, 5, 127)
                     drawshadowcrunch(periods["wxPhraseLong"][bottomtomorrow], smallmedfont, 440, 640, 5, screenwidth-440-10, 127)
                 else:
                     drawshadowtext("\n".join(wraptext(periods["narrative"][bottomtomorrow], pg.Rect(350, 480, screenwidth-350-15, 768-64-15), smallishfont)), smallishfont, 350, 480, 5, 127)
                     buffer = pg.Surface((192, 192))
                     pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 192, 192))
-                    buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                    buffer = blur(expandSurface(buffer, 6), 4)
                     window.blit(buffer, (110, 490), special_flags=pg.BLEND_RGBA_MULT)
                     if weathericonbig != None:
                         window.blit(weathericonbig, (100, 480))
@@ -1567,7 +1692,7 @@ def main():
                     for i in range(7):
                         buffer = pg.Surface((140, 556))
                         pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 140, 556))
-                        buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                        buffer = blur(expandSurface(buffer, 6), 4)
                         window.blit(buffer, (20 + i*142, 133), special_flags=pg.BLEND_RGBA_MULT)
                         window.blit(weekbg if not nightv else weekbgn, (15 + i*142, 128))
                         if nowisday and i == 0:
@@ -1576,14 +1701,14 @@ def main():
                             continue
                         drawshadowtext(periods[i*2+(not nowisday)+nightv]["name"][0:3].upper(), smallmedfont, 15+i*142+70-smallmedfont.size(periods[i*2+(not nowisday)+nightv]["name"][0:3].upper())[0]/2, 138, 5, 127)
                         drawshadowtemp(periods[i*2+(not nowisday)+nightv]["temperature"], bigfont, 30 + i*142, 168, 5, 127)
-                        drawshadowtext("Wind:", smallishfont, 40 + i*142, 300, 5, 127)
+                        drawshadowtext(f"{lang['wind']}:", smallishfont, 40 + i*142, 300, 5, 127)
                         drawshadowtext(periods[i*2+(not nowisday)+nightv]["windDirection"], medfont, 85+i*142-medfont.size(periods[i*2+(not nowisday)+nightv]["windDirection"])[0]/2, 330, 5, 127)
                         window.blit(weathericons[i*2+(not nowisday)+nightv], (21+142*i, 417+128+5))
                 elif nightv <= 3:
                     for i in range(7):
                         buffer = pg.Surface((140, 556))
                         pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 140, 556))
-                        buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                        buffer = blur(expandSurface(buffer, 6), 4)
                         window.blit(buffer, (20 + i*142, 133), special_flags=pg.BLEND_RGBA_MULT)
                         drawnight = (i % 2 == 0)
                         offset = not nowisday
@@ -1600,14 +1725,14 @@ def main():
                             continue
                         drawshadowtext(periods[i+offset+(nightv-2)*7]["name"][0:3].upper(), smallmedfont, 15+i*142+70-smallmedfont.size(periods[i+offset+(nightv-2)*7]["name"][0:3].upper())[0]/2, 138, 5, 127)
                         drawshadowtemp(periods[i+offset+(nightv-2)*7]["temperature"], bigfont, 30 + i*142, 168, 5, 127)
-                        drawshadowtext("Wind:", smallishfont, 40 + i*142, 300, 5, 127)
+                        drawshadowtext(f"{lang['wind']}:", smallishfont, 40 + i*142, 300, 5, 127)
                         drawshadowtext(periods[i+offset+(nightv-2)*7]["windDirection"], medfont, 85+i*142-medfont.size(periods[i+offset+(nightv-2)*7]["windDirection"])[0]/2, 330, 5, 127)
                         window.blit(weathericons[i+offset+(nightv-2)*7], (21+142*i, 417+128+5))
                 else:
                     if justswitched and "7daybuffer" not in cache:
                         buffer = pg.Surface((140, 276))
                         pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 140, 276))
-                        buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                        buffer = blur(expandSurface(buffer, 6), 4)
                         cache["7daybuffer"] = buffer
                     else:
                         buffer = cache["7daybuffer"]
@@ -1626,12 +1751,10 @@ def main():
                         #if not nowisday and i == 6 and drawingn:
                         #    continue
                         sind = 0
-                        for l in periods["daypartName"]:
-                            if l == None:
-                                sind += 1
-                                continue
-                            if l.startswith("Today") or l.startswith("Tonight") or l.startswith("This"):
-                                sind += 1
+                        if periods["daypartName"] == None:
+                            sind += 1
+                        else:
+                            sind += 2
                         ind = (j + sind)
                         
                         off = -142-71+71*(20-exfm)/2 + 78 * nowisday
@@ -1643,23 +1766,33 @@ def main():
                         
                         window.blit(buffer, (20 + scrh + i*142 - scrh*partnered - 78 * nowisday, 133+280*drawingn), special_flags=pg.BLEND_RGBA_MULT)
                         window.blit(weekbgc if not drawingn else weekbgnc, (15 + scrh + i*142 - scrh*partnered - 78 * nowisday, 128+280*drawingn))
-                        drawshadowtext(weather3["dayOfWeek"][math.floor(j/2+sind/2)][0:3].upper(), smallmedfont, 15+ scrh +i*142 - 78 * nowisday - scrh*partnered+70-smallmedfont.size(weather3["dayOfWeek"][math.floor(j/2+sind/2)][0:3].upper())[0]/2, 138+280*drawingn, 5, 127)
-                        drawshadowtemp(periods["temperature"][ind], medfont, 85 - 78 * nowisday - medfont.size(str(periods["temperature"][ind]))[0]/2 + scrh - scrh*partnered + i*142, 172+280*drawingn, 5, 127)
+                        drawshadowtext(weather3["dayOfWeek"][math.floor(j/2+sind/2)][0:(3 if locl != "de-DE" else 2)].upper(), smallmedfont, 15+ scrh +i*142 - 78 * nowisday - scrh*partnered+70-smallmedfont.size(weather3["dayOfWeek"][math.floor(j/2+sind/2)][0:(3 if locl != "de-DE" else 2)].upper())[0]/2, 138+280*drawingn, 5, 127)
+                        drawshadowtemp(trail(periods["temperature"][ind]), medfont, 85 - 78 * nowisday - medfont.size(trail(str(periods["temperature"][ind])))[0]/2 + scrh - scrh*partnered + i*142, 172+280*drawingn, 5, 127)
                         if weathericons[ind] != None:
                             window.blit(weathericons[ind], (21+ scrh +142*i - 78 * nowisday - scrh*partnered, 417+128+5-280*(not drawingn)))
-                        drawshadowtext(f'Wind: {periods["windDirectionCardinal"][ind]}', smallfont, 84+ scrh - 78 * nowisday - scrh*partnered +i*142-smallfont.size(f'Wind: {periods["windDirectionCardinal"][ind]}')[0]/2, 234+280*drawingn, 5, 127)
+                        drawshadowtext(f'{lang["wind"]}: {periods["windDirectionCardinal"][ind]}', smallfont, 84+ scrh - 78 * nowisday - scrh*partnered +i*142-smallfont.size(f'{lang["wind"]}: {periods["windDirectionCardinal"][ind]}')[0]/2, 234+280*drawingn, 5, 127)
                     #if partnered:
                     #    window.blit(turnintoashadow(logosurf), (20 - 39 * nowisday + 142 * 7, 138))
                     #    window.blit(logosurf, (15 - 39 * nowisday + 142 * 7, 133))
             elif view == 3 and perfit:
+                drawshadowtext("\n".join(wraptext("Unimplemented! If you want to see this, wait for the official update!", pg.Rect(5, 5, 1356, 768-128-64), medfont)), medfont, 5, 133, 5)
+                for i in range(24):
+                    pass
+            elif view == 4 and perfit:
                 if justswitched:
                     g, gs, vs = makehourlygraph()
+                    
+                    buffer = pg.Surface((994+screendiff, 556))
+                    pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 994+screendiff, 556))
+                    buffer = blur(expandSurface(buffer, 6), 4)
+                    
+                    cache["hourlybuffer"] = buffer
                     cache["hourlygraph"] = [g, gs, vs]
+                    justswitched = False
                 else:
                     g, gs, vs = cache["hourlygraph"]
-                buffer = pg.Surface((994+screendiff, 556))
-                pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, 994+screendiff, 556))
-                buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                    buffer = cache["hourlybuffer"]
+                
                 window.blit(buffer, (20, 133), special_flags=pg.BLEND_RGBA_MULT)
                 window.blit(graphbg, (15, 128))
                 window.blit(gs, (20, 133), special_flags=pg.BLEND_RGBA_MULT)
@@ -1682,10 +1815,10 @@ def main():
                 drawshadowtext(time3, smallmedfont, (screenwidth-640+530)/2 + 10, 128+500, 5)
                 drawshadowtext(time4, smallmedfont, (screenwidth-640+530)*3/4 + 5, 128+500, 5)
                 drawshadowtext(time5, smallmedfont, screenwidth-640+530, 128+500, 5)
-                drawshadowtextcol("Temperature", (255, 0, 0), smallmedfont, screenwidth-16-smallmedfont.size("Temperature")[0], 128, 5, 127)
-                drawshadowtextcol("Precipitation %", (0, 255, 255), smallmedfont, screenwidth-16-smallmedfont.size("Precipitation %")[0], 168, 5, 127)
-                drawshadowtextcol("Rel. Humidity %", (255, 127, 0), smallmedfont, screenwidth-16-smallmedfont.size("Rel. Humidity %")[0], 208, 5, 127)
-            elif view == 4 and perfit:
+                drawshadowtextcol(f"{lang['temp']}", (255, 0, 0), smallmedfont, screenwidth-16-smallmedfont.size(f"{lang['temp']}")[0], 128, 5, 127)
+                drawshadowtextcol(f"{lang['precip']} %", (0, 255, 255), smallmedfont, screenwidth-16-smallmedfont.size(f"{lang['precip']} %")[0], 168, 5, 127)
+                drawshadowtextcol(f"{lang['relhumidshort']} %", (255, 127, 0), smallmedfont, screenwidth-16-smallmedfont.size(f"{lang['relhumidshort']} %")[0], 208, 5, 127)
+            elif view == 5 and perfit:
                 for city in range(len(travelcities)):
                     drawshadowtext(travelnames[city], smallmedfont, 5, 130 + city*45, 5)
                     temps = []
@@ -1699,17 +1832,17 @@ def main():
                     lowt = min(temps)
                     hight = max(temps)
                     if not err:
-                        drawshadowtempcol(f'Low: {lowt}°F', (135, 206, 235), smallmedfont, screenwidth - 550, 130 + city*45, 5)
-                        drawshadowtextcol(f'High: {hight}°F', (255, 140, 0), smallmedfont, screenwidth - 250, 130 + city*45, 5)
+                        drawshadowtempcol(f'Low: {lowt}°{t}', (135, 206, 235), smallmedfont, screenwidth - 550, 130 + city*45, 5)
+                        drawshadowtextcol(f'High: {hight}°{t}', (255, 140, 0), smallmedfont, screenwidth - 250, 130 + city*45, 5)
                     else:
                         drawshadowtempcol(f'Data Error', (255, 0, 0), smallmedfont, screenwidth - 550, 130 + city*45, 5)
-            elif view == 5 and perfit:
-                drawshadowbigcrunch("\n".join(wraptext(f'{periods["daypartName"][0+bottomtomorrowm]}...{periods["narrative"][0+bottomtomorrowm]}', pg.Rect(15, 128, 994+screendiff, 588+32), smallmedfont)), (255, 255, 255), smallmedfont, 15, 128, 5, 994+screendiff, 588+32, 127)
             elif view == 6 and perfit:
-                drawshadowbigcrunch("\n".join(wraptext(f'{periods["daypartName"][1+bottomtomorrowm]}...{periods["narrative"][1+bottomtomorrowm]}', pg.Rect(15, 128, 994+screendiff, 588+32), smallmedfont)), (255, 255, 255), smallmedfont, 15, 128, 5, 994+screendiff, 588+32, 127)
+                drawshadowbigcrunch("\n".join(wraptext(f'{periods["daypartName"][0+bottomtomorrowm]}...{periods["narrative"][0+bottomtomorrowm]}', pg.Rect(15, 128, 994+screendiff, 588+32), smallmedfont)), (255, 255, 255), smallmedfont, 15, 128, 5, 994+screendiff, 588+32, 127)
             elif view == 7 and perfit:
-                drawshadowbigcrunch("\n".join(wraptext(f'{periods["daypartName"][2+bottomtomorrowm]}...{periods["narrative"][2+bottomtomorrowm]}', pg.Rect(15, 128, 994+screendiff, 588+32), smallmedfont)), (255, 255, 255), smallmedfont, 15, 128, 5, 994+screendiff, 588+32, 127)
+                drawshadowbigcrunch("\n".join(wraptext(f'{periods["daypartName"][1+bottomtomorrowm]}...{periods["narrative"][1+bottomtomorrowm]}', pg.Rect(15, 128, 994+screendiff, 588+32), smallmedfont)), (255, 255, 255), smallmedfont, 15, 128, 5, 994+screendiff, 588+32, 127)
             elif view == 8 and perfit:
+                drawshadowbigcrunch("\n".join(wraptext(f'{periods["daypartName"][2+bottomtomorrowm]}...{periods["narrative"][2+bottomtomorrowm]}', pg.Rect(15, 128, 994+screendiff, 588+32), smallmedfont)), (255, 255, 255), smallmedfont, 15, 128, 5, 994+screendiff, 588+32, 127)
+            elif view == 9 and perfit:
                 mappyind = -(math.floor(changetime / 60) % 5 + 1)
                 if True: #temp
                     window.blit(mappy, (screenwidth/2-mappy.get_width()/2, 800/2-mappy.get_height()/2))
@@ -1718,10 +1851,10 @@ def main():
                 else:
                     buffer = pg.Surface((radarimage.get_width(), radarimage.get_height()))
                     pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, radarimage.get_width(), radarimage.get_height()))
-                    buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                    buffer = blur(expandSurface(buffer, 6), 4)
                     window.blit(buffer, (screenwidth/2-radarimage.get_width()/2+5, 800/2-radarimage.get_height()/2+5), special_flags=pg.BLEND_RGBA_MULT)
                     window.blit(radarimage, (screenwidth/2-radarimage.get_width()/2, 800/2-radarimage.get_height()/2))
-            elif view == 9 and perfit:
+            elif view == 10 and perfit:
                 mappyind = -(math.floor(changetime / 60) % 5 + 1)
                 if True: #temp
                     window.blit(mappy, (screenwidth/2-mappy.get_width()/2, 800/2-mappy.get_height()/2))
@@ -1730,29 +1863,9 @@ def main():
                 else:
                     buffer = pg.Surface((hurricaneimage.get_width(), hurricaneimage.get_height()))
                     pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, hurricaneimage.get_width(), hurricaneimage.get_height()))
-                    buffer = pg.transform.gaussian_blur(expandSurface(buffer, 6), 4)
+                    buffer = blur(expandSurface(buffer, 6), 4)
                     window.blit(buffer, (screenwidth/2-hurricaneimage.get_width()/2+5, 800/2-hurricaneimage.get_height()/2+5), special_flags=pg.BLEND_RGBA_MULT)
                     window.blit(hurricaneimage, (screenwidth/2-hurricaneimage.get_width()/2, 800/2-hurricaneimage.get_height()/2))
-            elif view == 10 and perfit:
-                headlines_cleaned = []
-                headline_titles = []
-                
-                for hl in headlines:
-                    headlines_cleaned.append(re.sub('<[^<]+?>', '', hl["content"]))
-                    headline_titles.append(hl["title"])
-                lasth = 0
-                for tl in range(len(headline_titles)):
-                    times = headlines[tl]["issuanceTime"].split("T")[0]
-                    link = headlines[tl]["link"]
-                    buff = pg.Surface((screenwidth-30, 3))
-                    buff.fill((0, 0, 0))
-                    buff = pg.transform.gaussian_blur(expandSurface(buff, 6), 4)
-                    window.blit(buff, (0+2+15, lasth + 160 - 10), special_flags=pg.BLEND_RGBA_MULT)
-                    pg.draw.line(window, (127, 127, 127), (0+15, 160 + lasth - 12), (screenwidth-15, 160 + lasth - 12), 3)
-                    drawshadowtextcol(link, (127, 255, 255), smallfont, 15, 160 + lasth - 12 - smallfont.size(link)[1]/2, 5, 127)
-                    drawshadowtextcol(times, (255, 255, 255), smallfont, screenwidth - 15 - smallfont.size(times)[0], 160 + lasth - 12 - smallfont.size(times)[1]/2, 5, 127)
-                    last = drawshadowtext("\n".join(wraptext(headlines_cleaned[tl], pg.Rect(0, 0, screenwidth-10, 768), smallishfont)), smallishfont, 5, 160 + (lasth), 5, 127)
-                    lasth += (last.get_height() + 24)
             elif view == 11:
                 if justswitched:
                     alertscrollbig = 0
@@ -1834,7 +1947,7 @@ def main():
                         alertscroll = 0
                         drawshadowbigcrunch(alert_details[alertshow], (255, 224, 224), fnt, 15, 96, 5, 994+screendiff, 588, 127)
                 else:
-                    drawshadowtext("No active alerts.", smallmedfont, 15, 96, 5, 127)
+                    drawshadowtext(lang["noalertshort"], smallmedfont, 15, 96, 5, 127)
             #housekeeping
             realbotg = (bottomgradient if not redmode else bottomgradientred)
             window.blit(realbotg, (0, 768-realbotg.get_height()))
@@ -1859,34 +1972,34 @@ def main():
             if ticker == 0:
                 tickername = f'Last updated at {obstimeshort}'
             elif ticker == 1:
-                tickername = f'Temperature: {round(weather2["temperature"])}°F'
-                tickerright = f'Feels Like: {round(weather2["temperatureFeelsLike"])}°F'
+                tickername = f'{lang["temp"]}: {round(weather2["temperature"])}°{t}'
+                tickerright = f'{lang["feels"]}: {round(weather2["temperatureFeelsLike"])}°{t}'
             elif ticker == 2:
-                tickername = f'Humidity: {roundd(weather2["relativeHumidity"])}%'
-                tickerright = f'UV Index: {round(weather2["uvIndex"])}'
+                tickername = f'{lang["humid"]}: {roundd(weather2["relativeHumidity"])}%'
+                tickerright = f'{lang["uv"]}: {round(weather2["uvIndex"])}'
             elif ticker == 3:
                 pressa = ["(-)", "(+)", "(-)", "(++)", "(--)"]
-                tickername = f'Barometric Pressure: {round(weather2["pressureAltimeter"], 2)} in. {pressa[weather2["pressureTendencyCode"]]}'
+                tickername = f'{lang["pressure"]}: {round(weather2["pressureAltimeter"], 2)} {pres_s} {pressa[weather2["pressureTendencyCode"]]}'
             elif ticker == 4:
                 if weather2["windDirectionCardinal"] != "CALM":
-                    tickername = f'Wind: {weather2["windDirectionCardinal"]} @ {round(weather2["windSpeed"])} mph'
+                    tickername = f'{lang["wind"]}: {weather2["windDirectionCardinal"]} @ {round(weather2["windSpeed"])} {kmp}mph'
                 else:
-                    tickername = "Wind: Calm"
+                    tickername = f"{lang['wind']}: {lang['calm']}"
                 if weather2["windGust"]:
-                    tickerright = f"Gusts: {weather2['windGust']} mph"
+                    tickerright = f"{lang['gusts']}: {weather2['windGust']} {kmp}mph"
             elif ticker == 5:
                 try:
                     ceiling = nonezero(weather2["cloudCeiling"])
                 except IndexError:
                     ceiling = 0
-                tickername = f'Visibility: {round(weather2["visibility"])} miles'
-                tickerright = f'Ceiling: {"Unlimited" if ceiling == 0 else f"{ceiling} feet"}'
+                tickername = f'{lang["visib"]}: {round(weather2["visibility"])} {visi}'
+                tickerright = f'{lang["ceil"]}: {"Unlimited" if ceiling == 0 else f"{ceiling} feet"}'
             elif ticker == 6:
                 tickername = ads[adindex]
             drawshadowtext(tickername, smallmedfont, 5, 768-64+5, 5, 127)
             drawshadowtext(tickerright, smallmedfont, screenwidth-5-smallmedfont.size(tickerright)[0], 768-64+5, 5, 127)
             if perfit:
-                window.blit(bottomshadow, (0, 768-64-16), special_flags=pg.BLEND_RGBA_MULT)
+                window.blit(bottomshadow, (0, 768-realbotg.get_height()-bottomshadow.get_height()), special_flags=pg.BLEND_RGBA_MULT)
             
             #top bar (moved from top)
             if perfit:
@@ -1900,13 +2013,16 @@ def main():
                     if bottomtomorrowm:
                         if bottomtomorrow == 0:
                             bottomtomorrow = 1
-                    drawshadowtext(periods["daypartName"][bottomtomorrow].upper(), smallmedfont, 5, 465, 5, 127)
+                    drawshadowtext(periods["daypartName"][bottomtomorrow], smallmedfont, 5, 465, 5, 127)
             
-            viewnames = ["Split View", "Overview", "7-Day Forecast", "Hourly Graph", "Travel Cities", f"Weather Report ({periods['daypartName'][0+bottomtomorrowm]})", f"Weather Report ({periods['daypartName'][1+bottomtomorrowm]})", f"Weather Report ({periods['daypartName'][2+bottomtomorrowm]})", "Satellite/Radar Forecast" if not redmode else "Severe Weather Rader", "Probability of Precipitation" if not trackhurricanes else "Hurricane Tracker", "Forecast Office Headlines", "Alerts"]
-            viewName = viewnames[view]
-            if view == 2:
-                #force view 2
-                viewName = ["7-Day Forecast (Day)", "7-Day Forecast (Night)", "7-Day Forecast (Page 1)", "7-Day Forecast (Page 2)", "Extended Forecast"][nightv]
+            #viewnames = ["Split View", "Overview", "Extended Forecast", "Hourly Graph", "Travel Cities", f"Weather Report ({periods['daypartName'][0+bottomtomorrowm]})", f"Weather Report ({periods['daypartName'][1+bottomtomorrowm]})", f"Weather Report ({periods['daypartName'][2+bottomtomorrowm]})", "Satellite/Radar Forecast" if not redmode else "Severe Weather Rader", "Probability of Precipitation" if not trackhurricanes else "Hurricane Tracker", "Forecast Office Headlines", "Alerts"]
+            viewnames = lang["viewnames"] if not redmode else lang["viewnamesred"]
+            viewName = viewnames[view].replace("$1", periods['daypartName'][0+bottomtomorrowm]).replace("$2", periods['daypartName'][1+bottomtomorrowm]).replace("$3", periods['daypartName'][2+bottomtomorrowm])
+            
+            #if view == 2:
+            #    #force view 2
+            #    viewName = ["7-Day Forecast (Day)", "7-Day Forecast (Night)", "7-Day Forecast (Page 1)", "7-Day Forecast (Page 2)", "Extended Forecast"][nightv]
+            
             if overridetime > 0:
                 overridetime -= 60 * delta
                 viewName = name
@@ -1915,8 +2031,12 @@ def main():
             else:
                 drawshadowtext(viewName, smallmedfont, screenwidth/2-smallmedfont.size(viewName)[0]/2, 5, 5, 127, round(255-transitiontime*255/60))
                 drawshadowtext(lastname, smallmedfont, screenwidth/2-smallmedfont.size(lastname)[0]/2, 5, 5, 127, round(transitiontime*255/60))
-            drawshadowtext(splubby(dt.datetime.now().strftime(timeformattop)), smallmedfont, 5, 5, 5, 127)
-            #drawshadowtext(clock.get_fps(), smallmedfont, 5, 5, 5, 127)
+            
+            if showfps:
+                drawshadowtext(round(clock.get_fps()), smallmedfont, 5, 5, 5, 127)
+            else:
+                drawshadowtext(splubby(dt.datetime.now().strftime(timeformattop)), smallmedfont, 5, 5, 5, 127)
+            
             drawshadowtext(realstationname, smallmedfont, screenwidth-10-smallmedfont.size(realstationname)[0], 5, 5, 127)
             #drawshadowtext("Pennsylvania", smallmedfont, screenwidth-10-smallmedfont.size("Pennsylvania")[0], 5, 5, 127)
             
@@ -1947,7 +2067,10 @@ def main():
                 final.blit(pg.transform.smoothscale(window, scale), (0, 0))
             else:
                 final.blit(pg.transform.scale(window, scale), (0, 0))
-        pg.display.flip()
+        opswindow.fill((0, 130, 255))
+        drawshadowtext("Admin Panel", smallmedfont, 5, 5, 5, wind=opswindow)
+        realwindow.flip()
+        realops.flip()
 
 if not getattr(pg, "IS_CE", False):
     raise ModuleNotFoundError("Pygame CE is required for this application! Please uninstall Pygame and install Pygame CE instead.")
@@ -1963,4 +2086,4 @@ except Exception as err:
                 work = False
         window.blit(gradientred, (0, 0))
         drawshadowtext(err.__repr__(), smallfont, 15, 15, 5)
-        pg.display.flip()
+        realwindow.flip()

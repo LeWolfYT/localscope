@@ -35,24 +35,26 @@ scaled = True #if true, rescales to the size below
 smoothscale = True
 size = (1920, 1080)
 
-graphicalwidth = 840
-graphicalscale = 0.9
-#change depending on image height. keep in mind that you have around 640px of vertical space and 1000px of horizontal space
-#for the contiguous usa, 840 works fine
-
-#for background images (set to false for gradient)
+#for background images (set to false if you want to use the gradient image set in your theme)
 background_image_use = True
 background = "/path/to/img.jpg"
 backgroundred = "/path/to/redimg.jpg"
 
-apikey='KEY GOES HERE'
+units = "e" #any TWC unit type works here
+locale = "en-US" #currently the only officially supported languages are en-US (American English) and de-DE (German). Add your own languages by adding JSON files with the locale name in the lang folder.
+apikey = 'KEY GOES HERE'
 extendedfamount = 18 #how many days+nights of extended forecast to show. keep this even please.
 ```
-Right now, you can use this template as vars.py, changing the paths if needed.
+
+Right now, you can use this template as vars.py, changing the paths and values as needed.
 
 ## Segments
 
 Right now, you can press the 1 key to show the normal weather and the 2 key to start overlay mode. Set your chroma key to magenta for it to work. In OBS, a similarity value of 200 works best.
+
+## Keybinds
+
+There are a few keybinds that can be helpful to use. Pressing the E key will export all of the assets used by the program, including gradients generated on-the-fly. The F key will toggle an FPS counter on the top left, in place of the current time.
 
 ## Contributing
 
@@ -136,4 +138,4 @@ and so on for every replacement.
 
 ## A footnote about Ticker/LDL Mode
 
-Currently, custom graphics are broken with this mode. This will be fixed soon.
+Currently, custom graphics are broken with this mode. This will be fixed in the upcoming Worldwide Update.

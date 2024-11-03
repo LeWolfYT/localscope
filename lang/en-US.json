@@ -1,0 +1,20 @@
+{
+    "temp": "Temperature",
+    "precip": "Precipitation",
+    "precipchance": "Precipitation Chance",
+    "feels": "Feels Like",
+    "wind": "Wind",
+    "gusts": "Gusts",
+    "calm": "Calm",
+    "humid": "Humidity",
+    "relhumid": "Relative Humidity",
+    "relhumidshort": "Rel. Humidity",
+    "pressure": "Barometric Pressure",
+    "visib": "Visibility",
+    "uv": "UV Index",
+    "ceil": "Ceiling",
+    "noalert": "No active alerts in your area.",
+    "noalertshort": "No active alerts.",
+    "viewnames": ["Split View", "Overview", "Extended Forecast", "Hourly Forecast", "Hourly Graph", "Travel Cities", "Weather Report ($1)", "Weather Report ($2)", "Weather Report ($3)", "Satellite/Radar Forecast", "Probability of Precipitation", "Alerts"],
+    "viewnamesred": ["Split View", "Overview", "Extended Forecast", "Hourly Forecast", "Travel Cities", "Weather Report ($1)", "Weather Report ($2)", "Weather Report ($3)", "Severe Weather Radar", "Severe Weather Radar", "Alerts"]
+}

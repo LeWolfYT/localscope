@@ -1,0 +1,20 @@
+{
+    "temp": "Temperatur",
+    "precip": "Niederschlag",
+    "precipchance": "Niederschlagswahrscheinlichkeit",
+    "feels": "Gefühlte",
+    "wind": "Wind",
+    "gusts": "Böln",
+    "calm": "Kalm",
+    "humid": "Luftfeuchte",
+    "relhumid": "Relative Luftfeuchte",
+    "relhumidshort": "Rel. Luftfeuchte",
+    "pressure": "Luftdruck",
+    "visib": "Sichtweite",
+    "uv": "UV-Index",
+    "ceil": "Decke",
+    "noalert": "Keine aktiven Warnungen für Ihren Ort.",
+    "noalertshort": "Keine aktiven Warnungen.",
+    "viewnames": ["Gespaltblick", "Überblick", "Erweiterte Vorhersage", "Stündliche Vorhersage", "Stündliche Graph", "Reise Städte", "Wetterbericht ($1)", "Wetterbericht ($2)", "Wetterbericht ($3)", "Satelliten-/Radar Vorhersage", "Niederschlagswahrscheinlichkeit", "Warnungen"],
+    "viewnamesred": ["Gespaltblick", "Überblick", "Erweiterte Vorhersage", "Stündliche Vorhersage", "Stündliche Graph", "Reise Städte", "Wetterbericht ($1)", "Wetterbericht ($2)", "Wetterbericht ($3)", "Unwetterradar", "Unwetterradar", "Warnungen"]
+}
