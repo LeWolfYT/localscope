@@ -15,6 +15,6 @@
     "ceil": "Decke",
     "noalert": "Keine aktiven Warnungen für Ihren Ort.",
     "noalertshort": "Keine aktiven Warnungen.",
-    "viewnames": ["Gespaltblick", "Überblick", "Erweiterte Vorhersage", "Stündliche Vorhersage", "Stündliche Graph", "Reise Städte", "Wetterbericht ($1)", "Wetterbericht ($2)", "Wetterbericht ($3)", "Satelliten-/Radar Vorhersage", "Niederschlagswahrscheinlichkeit", "Warnungen"],
+    "viewnames": ["Gespaltblick", "Überblick", "Erweiterte Vorhersage", "Stündliche Vorhersage", "Stündliche Graph", "Reise Städte", "Wetterbericht ($1)", "Wetterbericht ($2)", "Wetterbericht ($3)", "Lokales Radar", "Niederschlagswahrscheinlichkeit", "Warnungen"],
     "viewnamesred": ["Gespaltblick", "Überblick", "Erweiterte Vorhersage", "Stündliche Vorhersage", "Stündliche Graph", "Reise Städte", "Wetterbericht ($1)", "Wetterbericht ($2)", "Wetterbericht ($3)", "Unwetterradar", "Unwetterradar", "Warnungen"]
 }

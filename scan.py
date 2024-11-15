@@ -12,7 +12,6 @@ import json
 import os
 import random as rd
 import time
-import re
 import math
 import map_tile_stitcher as ms
 import map_tile_stitcher.util.conversion as msc
@@ -309,6 +308,7 @@ def fallback(val, fallback):
     return val if val["value"] != None else fallback
 
 apikey = varr.apikey
+mapkey = varr.mapkey
 unites = getattr(varr, "units", "e")
 
 #temp unit
@@ -339,6 +339,8 @@ if not os.path.exists(langf):
 with open(langf, "r") as f:
     lang = json.loads(f.read())
 
+tile_amounts = 20
+
 def getWeather():
     
     global loadingstage
@@ -358,7 +360,7 @@ def getWeather():
     global sunrises
     sunrises = r.get(f"https://api.sunrisesunset.io/json?lat={coords.split(',')[0]}&lng={coords.split(',')[1]}").json()
     
-    zoom = 11
+    zoom = 8
     basetile = msc.get_index_from_coordinate(ms.Coordinate(float(coords.split(",")[0]), float(coords.split(",")[1])), zoom)
     
     loadingstage=1
@@ -406,6 +408,39 @@ def getWeather():
     
     global weather3 # forecast
     
+    global weathericons
+    global weathericonbig
+    
+    def getic():
+        global weathericons
+        global weathericonbig
+        loadingtasks.append("Loading icons...")
+        weathericons = [None for _ in range(22)]
+    
+        icdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "twc")
+        icss = {}
+        for image in os.listdir(icdir):
+            if image == ".DS_Store":
+                continue
+            icss[image] = pg.image.load(os.path.join(icdir,image))
+    
+        global bottomtomorrowm
+        for i in range(22):
+            if bottomtomorrowm and i == 0:
+                print("icon skipped")
+                continue
+            if smoothsc:
+                weathericons[i] = pg.transform.smoothscale(icss[str(weather3["daypart"][0]["iconCode"][i])+".png"], (128, 128))
+            else:
+                weathericons[i] = pg.transform.scale(icss[str(weather3["daypart"][0]["iconCode"][i])+".png"], (128, 128))
+            print(f'icon added: {weather3["daypart"][0]["iconCode"][i]}.png')
+        
+        if smoothsc:
+            weathericonbig = pg.transform.smoothscale(icss[str(weather3["daypart"][0]["iconCode"][0+bottomtomorrowm])+".png"], (192, 192))
+        else:
+            weathericonbig = pg.transform.scale(icss[str(weather3["daypart"][0]["iconCode"][0+bottomtomorrowm])+".png"], (192, 192))
+        loadingtasks.remove("Loading icons...")
+    
     def getef():
         global weather3
         loadingtasks.append("Retrieving extended forecast...")
@@ -414,6 +449,7 @@ def getWeather():
         global bottomtomorrowm
         bottomtomorrowm = (weather3["daypart"][0]["daypartName"][0] == None)
         loadingtasks.remove("Retrieving extended forecast...")
+        th.Thread(target=getic).start()
     th.Thread(target=getef).start()
     
     global weatherraw
@@ -459,35 +495,6 @@ def getWeather():
         loadingtasks.remove("Retrieving alerts...")
     th.Thread(target=getal).start()
     
-    global weathericons
-    global weathericonbig
-    def getic():
-        global weathericons
-        global weathericonbig
-        loadingtasks.append("Loading icons...")
-        weathericons = [None for _ in range(22)]
-    
-        icdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "twc")
-        icss = {}
-        for image in os.listdir(icdir):
-            if image == ".DS_Store":
-                continue
-            icss[image] = pg.image.load(os.path.join(icdir,image))
-    
-        for i in range(22):
-            if bottomtomorrowm and i == 0:
-                continue
-            if smoothsc:
-                weathericons[i] = pg.transform.smoothscale(icss[str(weather3["daypart"][0]["iconCode"][i])+".png"], (128, 128))
-            else:
-                weathericons[i] = pg.transform.scale(icss[str(weather3["daypart"][0]["iconCode"][i])+".png"], (128, 128))
-        
-        if smoothsc:
-            weathericonbig = pg.transform.smoothscale(icss[str(weather3["daypart"][0]["iconCode"][0+bottomtomorrowm])+".png"], (192, 192))
-        else:
-            weathericonbig = pg.transform.scale(icss[str(weather3["daypart"][0]["iconCode"][0+bottomtomorrowm])+".png"], (192, 192))
-        loadingtasks.remove("Loading icons...")
-    th.Thread(target=getic).start()
     def getim():
         loadingtasks.append("Loading images...")
         global mappy
@@ -513,11 +520,12 @@ def getWeather():
         global mappy_precip
         global timestam
 
-        osmtiles = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        twctiles_heat = "https://api.weather.com/v3/TileServer/tile/satradFcst?ts={ts}&fts={fts}&xyz={x}:{y}:{z}&apiKey=" + apikey
-        twctiles_precip = "https://api.weather.com/v3/TileServer/tile/precip24hrFcst?ts={ts}&fts={fts}&xyz={x}:{y}:{z}&apiKey=" + apikey
-        twch_temp = [[[] for _ in range(5)] for _ in range(abs(tilestart.x - tileend.x))]
-        twpc_temp = [[[] for _ in range(5)] for _ in range(abs(tilestart.x - tileend.x))]
+        #osmtiles = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        osmtiles = "https://api.mapbox.com/styles/v1/goldbblazez/ckgc8lzdz4lzh19qt7q9wbbr9/tiles/256/{z}/{x}/{y}?access_token=" + mapkey
+        twctiles_heat = "https://api.weather.com/v3/TileServer/tile/twcRadarMosaic?ts={ts}&xyz={x}:{y}:{z}&apiKey=" + apikey
+        # twctiles_precip = "https://api.weather.com/v3/TileServer/tile/precip24hrFcst?ts={ts}&fts={fts}&xyz={x}:{y}:{z}&apiKey=" + apikey
+        twch_temp = [[[] for _ in range(tile_amounts)] for _ in range(abs(tilestart.x - tileend.x))]
+        # twpc_temp = [[[] for _ in range(5)] for _ in range(abs(tilestart.x - tileend.x))]
 
         try:
             os.mkdir(os.path.join(cachedir, "cache"))
@@ -544,57 +552,81 @@ def getWeather():
         def getmaph():
             for i in range(abs(tilestart.x - tileend.x)):
                 for j in range(abs(tilestart.y - tileend.y)):
-                    base1 = ppa["seriesInfo"]["tempFcst"]["series"][0]
-                    for k in range(5):
-                        ht = twctiles_heat.format(ts=base1["ts"], fts=base1["fts"][-(k+1)], z=zoom, x=tilesneededx[i], y=tilesneededy[j])
+                    base1 = ppa["seriesInfo"]["twcRadarMosaic"]["series"]
+                    for k in range(tile_amounts):
+                        twch_temp[i][k].append(None)
+                        timestam[0].append(dt.datetime.fromtimestamp(base1[tile_amounts-1-k]["ts"]))
+            def getmaph_sect(k):
+                for i in range(abs(tilestart.x - tileend.x)):
+                    for j in range(abs(tilestart.y - tileend.y)):
+                        base1 = ppa["seriesInfo"]["twcRadarMosaic"]["series"]
+                        ht = twctiles_heat.format(ts=base1[4-k]["ts"], z=zoom, x=tilesneededx[i], y=tilesneededy[j])
                         eh = r.get(ht, headers=rheaders).content
-                        twch_temp[i][k].append(pg.image.load(BytesIO(eh)))
-                        print("h ts ", dt.datetime.fromtimestamp(base1["ts"]))
-                        print("h fts ", dt.datetime.fromtimestamp(base1["fts"][-(k+1)]))
-                        timestam[0].append(dt.datetime.fromtimestamp(base1["fts"][-(k+1)]))
+                        twch_temp[i][k][j] = (pg.image.load(BytesIO(eh)))
+                        print("mapsect:", dt.datetime.fromtimestamp(base1[tile_amounts-1-k]["ts"]), "i", i, "j", j, "k", k)
+            threads = []
+            for k in range(tile_amounts):
+                threads.append(th.Thread(target=getmaph_sect, args=[k]))
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
             global maphdone
             maphdone = False
-        global mappdone
-        mappdone = False
-        def getmapp():
-            for i in range(abs(tilestart.x - tileend.x)):
-                for j in range(abs(tilestart.y - tileend.y)):
-                    base2 = ppa["seriesInfo"]["satradFcst"]["series"][0]
-                    for k in range(5):
-                        pc = twctiles_precip.format(ts=base2["ts"], fts=base2["fts"][-(k+1)], z=zoom, x=tilesneededx[i], y=tilesneededy[j])
-                        ep = r.get(pc, headers=rheaders).content
-                        twpc_temp[i][k].append(pg.image.load(BytesIO(ep)))
-                        print("p ts ", dt.datetime.fromtimestamp(base2["ts"]))
-                        print("p fts ", dt.datetime.fromtimestamp(base2["fts"][-(k+1)]))
-                        timestam[1].append(dt.datetime.fromtimestamp(base2["fts"][-(k+1)]))
-            global mappdone
-            mappdone = False
+        # global mappdone
+        # mappdone = False
+        # def getmapp():
+        #     for i in range(abs(tilestart.x - tileend.x)):
+        #         for j in range(abs(tilestart.y - tileend.y)):
+        #             base2 = ppa["seriesInfo"]["satradFcst"]["series"][0]
+        #             for k in range(5):
+        #                 twpc_temp[i][k].append(None)
+        #                 timestam[1].append(dt.datetime.fromtimestamp(base2["fts"][-(k+1)]))
+        #     def getmapp_sect(k):
+        #         for i in range(abs(tilestart.x - tileend.x)):
+        #             for j in range(abs(tilestart.y - tileend.y)):
+        #                 base2 = ppa["seriesInfo"]["satradFcst"]["series"][0]
+        #                 pc = twctiles_precip.format(ts=base2["ts"], fts=base2["fts"][-(k+1)], z=zoom, x=tilesneededx[i], y=tilesneededy[j])
+        #                 ep = r.get(pc, headers=rheaders).content
+        #                 twpc_temp[i][k][j] = (pg.image.load(BytesIO(ep)))
+        #                 print("p ts ", dt.datetime.fromtimestamp(base2["ts"]))
+        #                 print("p fts ", dt.datetime.fromtimestamp(base2["fts"][-(k+1)]))
+        #                 print("mapsect:", dt.datetime.fromtimestamp(base2["fts"][-(k+1)]), "i", i, "j", j, "k", k)
+            
+        #     threads = []
+        #     for k in range(5):
+        #         threads.append(th.Thread(target=getmapp_sect, args=[k]))
+        #     for thread in threads:
+        #         thread.start()
+        #     for thread in threads:
+        #         thread.join()
+        #     global mappdone
+        #     mappdone = False
         
         premapt = th.Thread(target=premap)
         mapht = th.Thread(target=getmaph)
-        mappt = th.Thread(target=getmapp)
+        # mappt = th.Thread(target=getmapp)
         premapt.start()
         mapht.start()
-        mappt.start()
+        # mappt.start()
         
         premapt.join()
         mapht.join()
-        mappt.join()
+        # mappt.join()
         
         print("maps done")
         mappy = pg.Surface((256 * tilesneededw, 256*tilesneededh))
-        mappy_heat = [pg.Surface((256 * tilesneededw, 256*tilesneededh)) for _ in range(5)]
-        mappy_precip = [pg.Surface((256 * tilesneededw, 256*tilesneededh)) for _ in range(5)]
+        mappy_heat = [pg.Surface((256 * tilesneededw, 256*tilesneededh), flags=pg.SRCALPHA) for _ in range(tile_amounts)]
+        # mappy_precip = [pg.Surface((256 * tilesneededw, 256*tilesneededh)) for _ in range(tile_amounts)]
         mappy = pg.Surface((256 * tilesneededw, 256*tilesneededh))
         for i in range(len(mappy_temp)):
             for j in range(len(mappy_temp[i])):
                 mappy.blit(mappy_temp[i][j], (i*256, j*256))
-                for k in range(5):
+                for k in range(tile_amounts):
                     mappy_heat[k].blit(twch_temp[i][k][j], (i*256, j*256))
-                    mappy_precip[k].blit(twpc_temp[i][k][j], (i*256, j*256))
-        for k in range(5):
-            mappy_heat[k].set_alpha(round(255/6*5))
-            mappy_precip[k].set_alpha(round(255/6*5))
+                    # mappy_precip[k].blit(twpc_temp[i][k][j], (i*256, j*256))
+        # for k in range(5):
+        #     mappy_precip[k].set_alpha(round(255/6*5))
         loadingtasks.remove("Loading images...")
     th.Thread(target=getim).start()
     
@@ -729,7 +761,7 @@ def refreshWeather():
     
 def refreshTiles():
     print("refreshing tiles!")
-    zoom = 11
+    zoom = 8
     basetile = msc.get_index_from_coordinate(ms.Coordinate(float(coords.split(",")[0]), float(coords.split(",")[1])), zoom)
     
     tilestart = ms.GridIndex(basetile.x - math.floor(tilesneededw/2), basetile.y - math.floor(tilesneededh/2), zoom)
@@ -743,11 +775,12 @@ def refreshTiles():
     global mappy_heat
     global mappy_precip
     
-    osmtiles = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-    twctiles_heat = "https://api.weather.com/v3/TileServer/tile/satradFcst?ts={ts}&fts={fts}&xyz={x}:{y}:{z}&apiKey=" + apikey
-    twctiles_precip = "https://api.weather.com/v3/TileServer/tile/precip24hrFcst?ts={ts}&fts={fts}&xyz={x}:{y}:{z}&apiKey=" + apikey
-    twch_temp = [[[] for _ in range(5)] for _ in range(abs(tilestart.x - tileend.x))]
-    twpc_temp = [[[] for _ in range(5)] for _ in range(abs(tilestart.x - tileend.x))]
+    #osmtiles = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    osmtiles = "https://api.mapbox.com/styles/v1/goldbblazez/ckgc8lzdz4lzh19qt7q9wbbr9/tiles/256/{z}/{x}/{y}?access_token=" + mapkey
+    twctiles_heat = "https://api.weather.com/v3/TileServer/tile/twcRadarMosaic?ts={ts}&xyz={x}:{y}:{z}&apiKey=" + apikey
+    # twctiles_precip = "https://api.weather.com/v3/TileServer/tile/precip24hrFcst?ts={ts}&fts={fts}&xyz={x}:{y}:{z}&apiKey=" + apikey
+    twch_temp = [[[] for _ in range(tile_amounts)] for _ in range(abs(tilestart.x - tileend.x))]
+    # twpc_temp = [[[] for _ in range(5)] for _ in range(abs(tilestart.x - tileend.x))]
     
     try:
         os.mkdir(os.path.join(cachedir, "cache"))
@@ -770,27 +803,26 @@ def refreshTiles():
             #if tilesneededx[i] == basetile.x:
             #        if tilesneededy[j] == basetile.y:
             #            pg.image.save(mappy_temp[i][-1], os.path.join(realcache, f"{zoom}_{tilesneededx[i]}_{tilesneededy[j]}_thisisit.png"))
-            base1 = ppa["seriesInfo"]["tempFcst"]["series"][0]
-            base2 = ppa["seriesInfo"]["satradFcst"]["series"][0]
-            for k in range(5):
-                ht = twctiles_heat.format(ts=base1["ts"], fts=base1["fts"][-(k+1)], z=zoom, x=tilesneededx[i], y=tilesneededy[j])
-                pc = twctiles_precip.format(ts=base2["ts"], fts=base2["fts"][-(k+1)], z=zoom, x=tilesneededx[i], y=tilesneededy[j])
+            base1 = ppa["seriesInfo"]["twcRadarMosaic"]["series"]
+            #base2 = ppa["seriesInfo"]["satradFcst"]["series"][0]
+            for k in range(tile_amounts):
+                ht = twctiles_heat.format(ts=base1["ts"][tile_amounts--k], z=zoom, x=tilesneededx[i], y=tilesneededy[j])
+                # pc = twctiles_precip.format(ts=base2["ts"], fts=base2["fts"][-(k+1)], z=zoom, x=tilesneededx[i], y=tilesneededy[j])
                 eh = r.get(ht, headers=rheaders).content
                 twch_temp[i][k].append(pg.image.load(BytesIO(eh)))
-                ep = r.get(pc, headers=rheaders).content
-                twpc_temp[i][k].append(pg.image.load(BytesIO(ep)))
-                timestam[0].append(dt.datetime.fromtimestamp(base1["fts"][-(k+1)]))
-                timestam[1].append(dt.datetime.fromtimestamp(base2["fts"][-(k+1)]))
+                # ep = r.get(pc, headers=rheaders).content
+                # twpc_temp[i][k].append(pg.image.load(BytesIO(ep)))
+                timestam[0][k] = (dt.datetime.fromtimestamp(base1[tile_amounts--k]["ts"]))
+                #timestam[1][k] = (dt.datetime.fromtimestamp(base2["fts"][-(k+1)]))
     
     for i in range(len(mappy_temp)):
         for j in range(len(mappy_temp[i])):
             mappy.blit(mappy_temp[i][j], (i*256, j*256))
-            for k in range(5):
+            for k in range(tile_amounts):
                 mappy_heat[k].blit(twch_temp[i][k][j], (i*256, j*256))
-                mappy_precip[k].blit(twpc_temp[i][k][j], (i*256, j*256))
-    for k in range(5):
-        mappy_heat[k].set_alpha(round(255/6*5))
-        mappy_precip[k].set_alpha(round(255/6*5))
+                # mappy_precip[k].blit(twpc_temp[i][k][j], (i*256, j*256))
+    # for k in range(5):
+    #     mappy_precip[k].set_alpha(round(255/6*5))
 
 class RepeatTimer(th.Timer):
     def run(self):  
@@ -1383,7 +1415,7 @@ def main():
     #hourlygraph
     
     
-    sections = 11
+    sections = 10
     print("main loop started")
     
     try:
@@ -1843,7 +1875,9 @@ def main():
             elif view == 8 and perfit:
                 drawshadowbigcrunch("\n".join(wraptext(f'{periods["daypartName"][2+bottomtomorrowm]}...{periods["narrative"][2+bottomtomorrowm]}', pg.Rect(15, 128, 994+screendiff, 588+32), smallmedfont)), (255, 255, 255), smallmedfont, 15, 128, 5, 994+screendiff, 588+32, 127)
             elif view == 9 and perfit:
-                mappyind = -(math.floor(changetime / 60) % 5 + 1)
+                if justswitched:
+                    changetime = 30 * 60
+                mappyind = -(math.floor(changetime / 30) % 20 + 1)
                 if True: #temp
                     window.blit(mappy, (screenwidth/2-mappy.get_width()/2, 800/2-mappy.get_height()/2))
                     window.blit(mappy_heat[mappyind], (screenwidth/2-mappy_heat[mappyind].get_width()/2, 800/2-mappy_heat[mappyind].get_height()/2))
@@ -1854,19 +1888,7 @@ def main():
                     buffer = blur(expandSurface(buffer, 6), 4)
                     window.blit(buffer, (screenwidth/2-radarimage.get_width()/2+5, 800/2-radarimage.get_height()/2+5), special_flags=pg.BLEND_RGBA_MULT)
                     window.blit(radarimage, (screenwidth/2-radarimage.get_width()/2, 800/2-radarimage.get_height()/2))
-            elif view == 10 and perfit:
-                mappyind = -(math.floor(changetime / 60) % 5 + 1)
-                if True: #temp
-                    window.blit(mappy, (screenwidth/2-mappy.get_width()/2, 800/2-mappy.get_height()/2))
-                    window.blit(mappy_precip[mappyind], (screenwidth/2-mappy_heat[mappyind].get_width()/2, 800/2-mappy_heat[mappyind].get_height()/2))
-                    drawshadowtext(timestam[1][mappyind].__str__(), smallishfont, 5, 70, 5)
-                else:
-                    buffer = pg.Surface((hurricaneimage.get_width(), hurricaneimage.get_height()))
-                    pg.draw.rect(buffer, (127, 127, 127, 127), pg.rect.Rect(0, 0, hurricaneimage.get_width(), hurricaneimage.get_height()))
-                    buffer = blur(expandSurface(buffer, 6), 4)
-                    window.blit(buffer, (screenwidth/2-hurricaneimage.get_width()/2+5, 800/2-hurricaneimage.get_height()/2+5), special_flags=pg.BLEND_RGBA_MULT)
-                    window.blit(hurricaneimage, (screenwidth/2-hurricaneimage.get_width()/2, 800/2-hurricaneimage.get_height()/2))
-            elif view == 11:
+            elif view == 10:
                 if justswitched:
                     alertscrollbig = 0
                     alerttimeout = 60 * 10

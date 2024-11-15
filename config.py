@@ -50,6 +50,8 @@ add_var("graphicalwidth", 840)
 add_var("background_image_use", False)
 add_var("background", "")
 add_var("backgroundred", "")
+add_var("apikey", "")
+add_var("mapkey", "")
 add_var("image_replace", {})
 add_var("color_replace", {})
 
