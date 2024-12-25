@@ -121,15 +121,15 @@ def roundd(val, precision=0):
 def generateGradient(col1, col2, w=screenwidth, h=768, a1=255, a2=255):
     r1, g1, b1 = col1[0], col1[1], col1[2]
     r2, g2, b2 = col2[0], col2[1], col2[2]
-    surface = pg.Surface((w, h)).convert_alpha()
+    surface = pg.Surface((w, h))
     surface.fill((255, 255, 255, 255))
     for i in range(h):
         tr = i/(h-1)
-        transpar = pg.Surface((w, 1)).convert_alpha()
+        transpar = pg.Surface((w, 1))
         transpar.fill((255, 255, 255, (a1*(1-tr) + a2*tr)))
         pg.draw.line(transpar, ((r1*(1-tr) + r2*tr), (g1*(1-tr) + g2*tr), (b1*(1-tr) + b2*tr)), (0, 0), (w, 0))
         surface.blit(transpar, (0, i), special_flags=pg.BLEND_RGBA_MULT)
-    return surface.convert_alpha()
+    return surface
 
 def generateGradientHoriz(col1, col2, w=screenwidth, h=768, a1=255, a2=255):
     r1, g1, b1 = col1[0], col1[1], col1[2]
@@ -141,7 +141,7 @@ def generateGradientHoriz(col1, col2, w=screenwidth, h=768, a1=255, a2=255):
         pg.draw.line(surface, ((r1*(1-tr) + r2*tr), (g1*(1-tr) + g2*tr), (b1*(1-tr) + b2*tr), (a1*(1-tr) + a2*tr)), (i, 0), (i, h))
     return surface
 
-pg.display.set_mode()
+#pg.display.set_mode()
 gradient = generateGradient(*gradient_c)
 gradientred = generateGradient(*gradient_redc)
 topgradient = generateGradientHoriz(*topgradient_c, h=64)
@@ -334,7 +334,7 @@ if usebg:
     bgimager = pg.image.load(getattr(varr, "backgroundred", varr.background))
 
 if usebg:
-    window.blit(bgimage, (0, 0))
+    window.blit(pg.transform.smoothscale(bgimage, (screenwidth, 768)), (0, 0))
 else:
     window.blit(gradient, (0, 0))
 

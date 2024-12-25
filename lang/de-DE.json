@@ -13,8 +13,18 @@
     "visib": "Sichtweite",
     "uv": "UV-Index",
     "ceil": "Decke",
+    "nextup": "Nächste...",
     "noalert": "Keine aktiven Warnungen für Ihren Ort.",
+    "localscopeby": "LocalScope von...",
+    "alsotry": "Probieren Sie auch WeatherHDS!",
+    "loading": "Laden...",
+    "low": "Tief",
+    "high": "Hoch",
+    "dataerror": "Datenfehler",
     "noalertshort": "Keine aktiven Warnungen.",
-    "viewnames": ["Gespaltblick", "Überblick", "Erweiterte Vorhersage", "Stündliche Vorhersage", "Stündliche Graph", "Reise Städte", "Wetterbericht ($1)", "Wetterbericht ($2)", "Wetterbericht ($3)", "Lokales Radar", "Niederschlagswahrscheinlichkeit", "Warnungen"],
-    "viewnamesred": ["Gespaltblick", "Überblick", "Erweiterte Vorhersage", "Stündliche Vorhersage", "Stündliche Graph", "Reise Städte", "Wetterbericht ($1)", "Wetterbericht ($2)", "Wetterbericht ($3)", "Unwetterradar", "Unwetterradar", "Warnungen"]
+    "sectionnames": ["Wetterbedingungen", "Wetter+Gesundheit", "Benutzerdefinierte Folien"],
+    "viewnames": ["Nächste...", "Gespaltblick", "Überblick", "Erweiterte Vorhersage", "Stündliche Vorhersage", "Stündliche Graph", "Reise Städte", "Wetterbericht ($1)", "Wetterbericht ($2)", "Wetterbericht ($3)", "Almanach", "Lokales Radar", "Kredit4Team"],
+    "viewnameshealth": ["Nächste...", "Luftqualität", "UV-Index", "Pollenbericht"],
+    "viewnamesadvisory": ["Warnungen", "Gespaltblick", "Überblick", "Erweiterte Vorhersage", "Stündliche Vorhersage", "Stündliche Graph", "Reise Städte", "Wetterbericht ($1)", "Wetterbericht ($2)", "Wetterbericht ($3)", "Almanach", "Lokales Radar", "Kredit4Team"],
+    "viewnamesred": ["Warnungen", "Gespaltblick", "Überblick", "Erweiterte Vorhersage", "Stündliche Vorhersage", "Stündliche Graph", "Reise Städte", "Wetterbericht ($1)", "Wetterbericht ($2)", "Wetterbericht ($3)", "Almanach", "Unwetterradar", "Kredit4Team"]
 }

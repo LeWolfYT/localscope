@@ -2,3 +2,5 @@ pygame-ce>=2.5.2
 pytz
 isodate
 map_tile_stitcher
+opencv-python
+requests
