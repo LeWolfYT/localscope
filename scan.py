@@ -145,7 +145,7 @@ currentscene = 0
 #1 = extended travel forecast
 #2 = live feed overlay
 
-maskcolor = (255, 0, 255)
+maskcolor = getattr(varr, "maskcolor", (255, 0, 255))
 print("getting directories")
 assetdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 iconf = os.path.join(assetdir, "icon.bmp")
@@ -280,14 +280,14 @@ print("done with pygame init")
 
 if not scaled:
     print("making unscaled window")
-    realwindow = pg.Window("LocalScope v1.5", (screenwidth, 768))
+    realwindow = pg.Window("LocalScope v1.5.1", (screenwidth, 768))
     realwindow.borderless = True
     window = realwindow.get_surface()
 else:
     print("making fake window")
     window = pg.Surface((screenwidth, 768))
     print("making actual window")
-    realwindow = pg.Window("LocalScope v1.5", scale)
+    realwindow = pg.Window("LocalScope v1.5.1", scale)
     final = realwindow.get_surface()
 
 #realops = pg.Window("LocalScope - Admin Panel", (640, 480))
@@ -304,7 +304,7 @@ pg.mouse.set_visible(False)
 
 #print("caption set")
 #pg.display.set_caption("LocalScope v1.4")
-print("LocalScope v1.5 - The Everything Update")
+print("LocalScope v1.5.1 - The Everything Update (Credits Fix)")
 
 if sound:
     print("loading sound")
@@ -1955,10 +1955,33 @@ def main():
             if stream:
                 global realstream
                 rt, frame = realstream.read()
-                frame = cv2.resize(frame, (screenwidth, 768))
+                
+                stretchmode = getattr(varr, "stretchmode", "stretch")
+                height = getattr(varr, "streamheight", 0)
+                streamy = getattr(varr, "streamy", 0)
+                
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 #frame = cv2.flip(frame, 1)
                 frame = cv2.transpose(frame)
+                
+                if stretchmode == "stretch":
+                    if height == 0:
+                        frame = cv2.resize(frame, (screenwidth, 768))
+                    else:
+                        frame = cv2.resize(frame, (screenwidth, height))
+                elif stretchmode == "fit":
+                    if height == 0:
+                        #fullscreen, but keep aspect ratio
+                        aspect = frame.shape[0] / frame.shape[1]
+                        frame = cv2.resize(frame, (768, int(aspect*768)))
+                    else:
+                        #fit to height, but keep aspect ratio
+                        aspect = frame.shape[0] / frame.shape[1]
+                        frame = cv2.resize(frame, (height, int(aspect*height)))
+                elif stretchmode == "fill":
+                    aspect = frame.shape[1] / frame.shape[0] #inverted
+                    frame = cv2.resize(frame, (int(aspect*screenwidth), screenwidth))
+                
                 framesurf = pg.surfarray.make_surface(frame)
                 #framesurf = pg.transform.rotate(framesurf, -90)
                 #framesurf = pg.transform.flip(framesurf, True, False)
@@ -1967,7 +1990,7 @@ def main():
                 #else:
                 #    framesurf = pg.transform.scale(framesurf, (screenwidth, 768))
 
-                window.blit(framesurf, (0, 0))
+                window.blit(framesurf, (screenwidth/2 - framesurf.get_width()/2, streamy))
                 
             window.blit(ldlgradient, (0, 768-ldlgradient.get_height()))
 
@@ -2548,8 +2571,9 @@ def main():
                     window.blit(turnintoashadow(mylogo), (screenwidth-mylogo.get_width()-95, 188+5))
                     window.blit(mylogo, (screenwidth-mylogo.get_width()-100, 188))
                     drawshadowtextcol(lang["alsotry"], (255, 255, 0), medfont, 5, 768-64-80, 5)
-                    window.blit(turnintoashadow(logosurf), (screenwidth/2-logosurf.get_width()/2+5, 768/2-logosurf.get_height()/2+5))
-                    window.blit(logosurf, (screenwidth/2-logosurf.get_width()/2, 768/2-logosurf.get_height()/2))
+                    if partnered:
+                        window.blit(turnintoashadow(logosurf), (screenwidth/2-logosurf.get_width()/2+5, 768/2-logosurf.get_height()/2+5))
+                        window.blit(logosurf, (screenwidth/2-logosurf.get_width()/2, 768/2-logosurf.get_height()/2))
             elif currentsection == 1:
                 # HEALTHSECT (here for search purposes)
                 if view == 1 and perfit:

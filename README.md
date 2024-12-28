@@ -73,7 +73,7 @@ musicdir = "/this/only/plays/in/playlist/mode/"
 ads = ["example ad 1", "example ad 2", "example ad 3", "example ad 4", "example ad 5"]
 adcrawltime = 10 #in seconds
 
-partnered = True #you can add your logo to the 7-day forecast
+partnered = True #you can add your logo to the credits
 logo = "/my/cool/logo.png"
 
 screenwidth = 1366 #1366 is default, for 4:3 use 1024. height is always 768
@@ -96,6 +96,10 @@ extendedfamount = 18 #how many days+nights of extended forecast to show. keep th
 stream = "https://example.com/stream.ts" #stream URL
 writer = "rtmp://example.com/live" #stream output. if you want to use tee muxer, make this an array and we'll do the work for you
 audiofile = "/path/to/audio.wav" #audio file for the stream. this gets played in the background on loop, since pygame doesn't support getting the currently playing audio bytes. don't set this if you want no audio
+maskcolor = (255, 0, 255) #color to be used as the background for the stream
+stretchmode = "stretch" #fit, fill, stretch
+#streamheight = 768 #height of the stream, leave out for default
+streamy = 0 #y offset
 
 plugins = [] #add plugins here. the plugin name is the folder name of the plugin in the plugins folder
 theme = "theme name here, leave blank or omit for default"
