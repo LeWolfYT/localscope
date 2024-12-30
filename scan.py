@@ -280,14 +280,14 @@ print("done with pygame init")
 
 if not scaled:
     print("making unscaled window")
-    realwindow = pg.Window("LocalScope v1.5.1", (screenwidth, 768))
+    realwindow = pg.Window("LocalScope v1.5.1_1", (screenwidth, 768))
     realwindow.borderless = True
     window = realwindow.get_surface()
 else:
     print("making fake window")
     window = pg.Surface((screenwidth, 768))
     print("making actual window")
-    realwindow = pg.Window("LocalScope v1.5.1", scale)
+    realwindow = pg.Window("LocalScope v1.5.1_1", scale)
     final = realwindow.get_surface()
 
 #realops = pg.Window("LocalScope - Admin Panel", (640, 480))
@@ -1993,6 +1993,14 @@ def main():
                 window.blit(framesurf, (screenwidth/2 - framesurf.get_width()/2, streamy))
                 
             window.blit(ldlgradient, (0, 768-ldlgradient.get_height()))
+            def four(fourcc):
+                return "".join([chr((fourcc >> 8 * i) & 0xFF) for i in range(4)])
+            if realdebug:
+                drawshadowtext(f"Stream FPS: {round(realstream.get(cv2.CAP_PROP_FPS))}", smallmedfont, 5, 40, 5, 127)
+                drawshadowtext(f"Stream Resolution: {realstream.get(cv2.CAP_PROP_FRAME_WIDTH)}x{realstream.get(cv2.CAP_PROP_FRAME_HEIGHT)}", smallmedfont, 5, 80, 5, 127)
+                drawshadowtext(f"FourCC: {four(int(realstream.get(cv2.CAP_PROP_FOURCC)))}", smallmedfont, 5, 120, 5, 127)
+                drawshadowtext(f"FPS: {round(clock.get_fps())}", smallmedfont, 5, 160, 5, 127)
+                drawshadowtext(f"Pixel Format: {four(int(realstream.get(cv2.CAP_PROP_CODEC_PIXEL_FORMAT)))}", smallmedfont, 5, 200, 5, 127)
 
             if len(alerts) > 0:
                 if len(alerts) > 1:
@@ -2813,11 +2821,11 @@ def main():
                         if showingalert > len(alerts)-1:
                             showingalert = 0
                     if not redmode:
-                        drawshadowcrunchcol(alerts[showingalert]["headlineText"], (255, 0, 0), smallmedfont, 5 + alertscroll, 80, 5, screenwidth-10, 127)
+                        drawshadowcrunchcol(alerts[showingalert]["headlineText"], (255, 0, 0), smallmedfont, 5 + alertscroll, 80+alerth, 5, screenwidth-10, 127)
                     else:
-                        drawshadowcrunchcol(alerts[showingalert]["headlineText"], (0, 127, 255), smallmedfont, 5 + alertscroll, 80, 5, screenwidth-10, 127)
+                        drawshadowcrunchcol(alerts[showingalert]["headlineText"], (0, 127, 255), smallmedfont, 5 + alertscroll, 80+alerth, 5, screenwidth-10, 127)
                     if len(alerts) > 1:
-                        drawshadowcrunchcol(alerts[(showingalert+1) if showingalert != len(alerts)-1 else 0]["headlineText"], (255, 0, 0) if not redmode else (0, 127, 255), smallmedfont, -screenwidth + 5 + alertscroll, 80, 5, screenwidth-15, 127)
+                        drawshadowcrunchcol(alerts[(showingalert+1) if showingalert != len(alerts)-1 else 0]["headlineText"], (255, 0, 0) if not redmode else (0, 127, 255), smallmedfont, -screenwidth + 5 + alertscroll, 80+alerth, 5, screenwidth-15, 127)
                 else:
                     drawshadowtext(lang["noalert"], smallmedfont, 5, 80+alerth, 5, 127)
             
