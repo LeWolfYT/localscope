@@ -5,3 +5,10 @@ __pycache__/
 build/
 export/
 ogg/
+cache/
+mappy_*.png
+mappy.png
+.DS_Store
+./**/.DS_Store
+./plugins/affiliate/brand.png
+plugins/affiliate/brand.png
