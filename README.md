@@ -53,7 +53,7 @@ While setting up the app, you'll need to create a `vars.py` file in the same fol
 weatheraddr = "http://wttr.in/?format=j2" #not used usually
 coords = "lat,long" #no spaces
 forcecoords = True #please use unless you are using musicmode="daytime". wttr.in is outdated
-station = "KPIT"
+station = "KPIT" #ICAO code of your nearest airport
 timezone = "EST"
 
 sysfont = True #will use a system font if true, ttf if false
